@@ -1,0 +1,12 @@
+
+ToDo:
+- BannerWhite Color correction
+- Add x86 Support (works)
+- Download and Zip File
+- Thread for Delay Function
+- CurrentSession Button no function
+
+Bugs:
+- color Change stay on black
+- app scaling is broken on bullshit devices
+- check version may fail
