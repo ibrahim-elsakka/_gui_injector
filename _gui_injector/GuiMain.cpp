@@ -59,7 +59,7 @@ GuiMain::GuiMain(QWidget* parent)
 
 	for (int i = 0; i <= 3; i++)
 		ui.tree_files->resizeColumnToContents(i);
-	//ui.tree_files->clear();
+	ui.tree_files->clear();
 
 	pState = new procState;
 	color_setup();
