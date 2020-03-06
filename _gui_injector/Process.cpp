@@ -6,7 +6,7 @@
 #include "process.h"
 
 
-int getFileArch(const char* szDllFile)
+enum ARCH getFileArch(const char* szDllFile)
 {
     BYTE* pSrcData = nullptr;
     IMAGE_NT_HEADERS* pOldNtHeader = nullptr;
@@ -15,7 +15,7 @@ int getFileArch(const char* szDllFile)
     if (!GetFileAttributesA(szDllFile))
     {
         printf("File doesn't exist\n");
-        return false;
+        return NONE;
     }
 
     std::ifstream File(szDllFile, std::ios::binary | std::ios::ate);
@@ -24,7 +24,7 @@ int getFileArch(const char* szDllFile)
     {
         printf("Opening the file failed: %X\n", (DWORD)File.rdstate());
         File.close();
-        return false;
+        return NONE;
     }
 
     auto FileSize = File.tellg();
@@ -32,7 +32,7 @@ int getFileArch(const char* szDllFile)
     {
         printf("Filesize is invalid.\n");
         File.close();
-        return false;
+        return NONE;
     }
 
     pSrcData = new BYTE[static_cast<UINT_PTR>(FileSize)];
@@ -40,7 +40,7 @@ int getFileArch(const char* szDllFile)
     {
         printf("Memory allocating failed\n");
         File.close();
-        return false;
+        return NONE;
     }
 
     File.seekg(0, std::ios::beg);
@@ -51,7 +51,7 @@ int getFileArch(const char* szDllFile)
     {
         printf("Invalid file\n");
         delete[] pSrcData;
-        return false;
+        return NONE;
     }
 
     pOldNtHeader = reinterpret_cast<IMAGE_NT_HEADERS*>(pSrcData + reinterpret_cast<IMAGE_DOS_HEADER*>(pSrcData)->e_lfanew);
@@ -69,114 +69,10 @@ int getFileArch(const char* szDllFile)
     }
 
     delete[] pSrcData;
-    return false;
+    return NONE;
 }
 
-
-bool getProcessList(std::vector<process_list>& pl)
-{
-
-    PROCESSENTRY32 procEntry = { 0 };
-    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
-
-    if (hSnapshot)
-    {
-        procEntry.dwSize = sizeof(PROCESSENTRY32);
-
-        if (Process32First(hSnapshot, &procEntry))
-        {
-            do
-            {
-                process_list pl_item;
-                pl_item.pid = procEntry.th32ProcessID;
-                int ret = wcstombs(pl_item.name, procEntry.szExeFile, sizeof(pl_item.name));
-                pl_item.arch = NONE;
-
-                HANDLE hOpenProc = OpenProcess(PROCESS_QUERY_INFORMATION, NULL, procEntry.th32ProcessID);
-                if (hOpenProc != NULL)
-                {
-                    BOOL tempWow64 = FALSE;
-
-                    BOOL bIsWow = IsWow64Process(hOpenProc, &tempWow64);
-                    if (bIsWow != 0)
-                    {
-                        if (tempWow64 == TRUE)
-                        {
-                            pl_item.arch = X64;
-                        }
-                        else
-                        {
-                            pl_item.arch = X86;
-                        }
-                    }
-                    CloseHandle(hOpenProc);
-
-                    pl.push_back(pl_item);
-                }
-
-            } while (Process32Next(hSnapshot, &procEntry));
-        }
-    }
-    CloseHandle(hSnapshot);
-    return true;
-}
-
-process_list getProcessByName(const char* proc)
-{
-
-    PROCESSENTRY32 procEntry = { 0 };
-    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
-
-    char name[250]; 
-    process_list pl_item;
-    pl_item.arch = NONE;
-    pl_item.pid = 0;
-
-    if (hSnapshot)
-    {
-        procEntry.dwSize = sizeof(PROCESSENTRY32);
-
-        if (Process32First(hSnapshot, &procEntry))
-        {
-            do
-            {
-                int ret = wcstombs(name, procEntry.szExeFile, sizeof(name));
-                if (!strcmp(name, proc))
-                {
-
-                    HANDLE hOpenProc = OpenProcess(PROCESS_QUERY_INFORMATION, NULL, procEntry.th32ProcessID);
-                    if (hOpenProc != NULL)
-                    {
-                        BOOL tempWow64 = FALSE;
-
-                        BOOL bIsWow = IsWow64Process(hOpenProc, &tempWow64);
-                        if (bIsWow != 0)
-                        {
-                            if (tempWow64 == TRUE)
-                            {
-                                pl_item.arch = X64;
-                            }
-                            else
-                            {
-                                pl_item.arch = X86;
-                            }
-                            pl_item.pid = procEntry.th32ProcessID;
-                            strcpy(pl_item.name, name);
-                            break;
-                        }
-                        CloseHandle(hOpenProc);
-
-                    }
-                }
-
-            } while (Process32Next(hSnapshot, &procEntry));
-        }
-    }
-    CloseHandle(hSnapshot);
-    return pl_item;
-}
-
-int getProcArch(int pid)
+enum ARCH getProcArch(const int pid)
 {
     HANDLE hOpenProc = OpenProcess(PROCESS_QUERY_INFORMATION, NULL, pid);
     if (hOpenProc != NULL)
@@ -197,7 +93,110 @@ int getProcArch(int pid)
             return NONE;
         }
         CloseHandle(hOpenProc);
-
     }
     return NONE;
+}
+
+Process_Struct getProcessByName(const char* proc)
+{
+    PROCESSENTRY32 procEntry = { 0 };
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+
+    char name[250]; 
+    Process_Struct ps;
+    memset(&ps, 0, sizeof(Process_Struct));
+
+    if (hSnapshot)
+    {
+        procEntry.dwSize = sizeof(PROCESSENTRY32);
+
+        if (Process32First(hSnapshot, &procEntry))
+        {
+            do
+            {
+                int ret = wcstombs(name, procEntry.szExeFile, sizeof(name));
+                if (!strcmp(name, proc))
+                {
+
+                    ps.arch = getProcArch(procEntry.th32ProcessID);
+                    if (ps.arch != ARCH::NONE)
+                    {
+                        ps.pid = procEntry.th32ProcessID;
+                        strcpy(ps.name, name);
+                        break;
+                    }
+                }
+
+            } while (Process32Next(hSnapshot, &procEntry));
+        }
+    }
+    CloseHandle(hSnapshot);
+    return ps;
+}
+
+Process_Struct getProcessByPID(const int pid)
+{
+    PROCESSENTRY32 procEntry = { 0 };
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+
+    char name[250];
+    Process_Struct ps;
+    memset(&ps, 0, sizeof(Process_Struct));
+
+    if (hSnapshot)
+    {
+        procEntry.dwSize = sizeof(PROCESSENTRY32);
+
+        if (Process32First(hSnapshot, &procEntry))
+        {
+            do
+            {
+                if(procEntry.th32ProcessID == pid)
+                {
+
+                    ps.arch = getProcArch(procEntry.th32ProcessID);
+                    if (ps.arch != ARCH::NONE)
+                    {
+                        ps.pid = procEntry.th32ProcessID;
+                        int ret = wcstombs(name, procEntry.szExeFile, sizeof(name));
+                        strcpy(ps.name, name);
+                        break;
+                    }
+                }
+
+            } while (Process32Next(hSnapshot, &procEntry));
+        }
+    }
+    CloseHandle(hSnapshot);
+    return ps;
+}
+
+bool getProcessList(std::vector<Process_Struct>& pl)
+{
+
+    PROCESSENTRY32 procEntry = { 0 };
+    HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+
+    if (hSnapshot)
+    {
+        procEntry.dwSize = sizeof(PROCESSENTRY32);
+
+        if (Process32First(hSnapshot, &procEntry))
+        {
+            do
+            {
+                Process_Struct ps_item;
+                memset(&ps_item, 0, sizeof(Process_Struct));
+
+                ps_item.pid = procEntry.th32ProcessID;
+                ps_item.arch = getProcArch(procEntry.th32ProcessID);
+                int ret = wcstombs(ps_item.name, procEntry.szExeFile, sizeof(ps_item.name));
+
+                pl.push_back(ps_item);
+
+            } while (Process32Next(hSnapshot, &procEntry));
+        }
+    }
+    CloseHandle(hSnapshot);
+    return true;
 }

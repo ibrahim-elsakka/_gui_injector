@@ -8,6 +8,7 @@
 #include <qsettings.h>
 #include <qthread.h>
 
+
 #include <string>
 #include "Banner.h"
 #include "Process.h"
@@ -24,9 +25,11 @@ GuiMain::GuiMain(QWidget* parent)
 	connect(ui.rb_proc, SIGNAL(clicked()), this, SLOT(set_rb_proc()));
 	connect(ui.rb_pid, SIGNAL(clicked()), this, SLOT(set_rb_pid()));
 	connect(ui.btn_proc, SIGNAL(clicked()), this, SLOT(pick_process()));
-	//connect(ui.cmb_proc, SIGNAL(keyPressEvent()), this, SLOT(procName_change()));
 	connect(ui.cmb_proc, SIGNAL(currentTextChanged(const QString&)), this, SLOT(procName_change()));
+	connect(ui.txt_pid, SIGNAL(textChanged(const QString&)), this, SLOT(procID_change()));
 
+	// Auto, Reset, Color
+	connect(ui.cb_auto, SIGNAL(clicked()), this, SLOT(auto_inject()));
 	connect(ui.btn_reset, SIGNAL(clicked()), this, SLOT(reset_settings()));
 	connect(ui.btn_light, SIGNAL(clicked()), this, SLOT(color_change()));
 
@@ -39,7 +42,7 @@ GuiMain::GuiMain(QWidget* parent)
 	connect(ui.btn_add, SIGNAL(clicked()), this, SLOT(add_file_dialog()));
 	connect(ui.btn_remove, SIGNAL(clicked()), this, SLOT(remove_file()));
 	connect(ui.tree_files, SIGNAL(itemDoubleClicked(QTreeWidgetItem*, int)), this, SLOT(select_file()));
-	connect(ui.btn_inject, SIGNAL(clicked()), this, SLOT(inject_file()));
+	connect(ui.btn_inject, SIGNAL(clicked()), this, SLOT(delay_inject()));
 
 	// Info
 	connect(ui.btn_tooltip, SIGNAL(clicked()), this, SLOT(tooltip_change()));
@@ -51,17 +54,32 @@ GuiMain::GuiMain(QWidget* parent)
 	connect(manager, &QNetworkAccessManager::finished, this, &GuiMain::replyFinished);
 
 	// GuiProcess
+	pss = new Process_State_Struct;
+	ps_picker = new Process_Struct;
+	pss->cbSession = true;
+	pss->cmbArch = 0;
+	pss->txtFilter = "";
+	memset(ps_picker, 0, sizeof(Process_Struct));
+
+	// GuiProcess
 	picker = new GuiProcess();
-	connect(this, SIGNAL(send_to_picker(procState)), picker, SLOT(get_from_inj(procState)));
-	connect(picker, SIGNAL(send_to_inj(procState)), this, SLOT(get_from_picker(procState)));
+	connect(this, SIGNAL(send_to_picker(Process_State_Struct*, Process_Struct*)), 
+		picker, SLOT(get_from_inj(Process_State_Struct*, Process_Struct*)));
+	connect(picker, SIGNAL(send_to_inj(Process_State_Struct*, Process_Struct*)), 
+		this, SLOT(get_from_picker(Process_State_Struct*, Process_Struct*)));
 
-	
+	// Timer
+	timer = new QTimer();
+	delayInjTimer = new QTimer();
+	delayInjTimer->setSingleShot(true);
+	connect(timer, SIGNAL(timeout()), this, SLOT(auto_loop_inject()));
+	connect(delayInjTimer, SIGNAL(timeout()), this, SLOT(inject_file()));
 
+	// Resize Column
 	for (int i = 0; i <= 3; i++)
 		ui.tree_files->resizeColumnToContents(i);
 	ui.tree_files->clear();
 
-	pState = new procState;
 	color_setup();
 	load_settings();
 	color_change();
@@ -73,14 +91,16 @@ GuiMain::GuiMain(QWidget* parent)
 	//winSize.setWidth(1000);
 	this->resize(winSize);
 
-	auto_inject();
 }
 
 GuiMain::~GuiMain()
 {
 	delete picker;
 	delete manager;
-	delete pState;
+	delete pss;
+	delete ps_picker;
+	delete timer;
+	delete delayInjTimer;
 }
 
 int GuiMain::str_to_arch(const QString str)
@@ -96,7 +116,6 @@ QString GuiMain::arch_to_str(const int arch)
 	else if (arch == 2) return QString("x86");
 	else return QString("NONE");
 }
-
 
 void GuiMain::closeEvent(QCloseEvent* event)
 {
@@ -120,27 +139,108 @@ void GuiMain::set_rb_pid()
 	ui.rb_pid->setChecked(true);
 }
 
+void GuiMain::unset_rb()
+{
+	ui.cmb_proc->setEnabled(false);
+	ui.txt_pid->setEnabled(false);
+	ui.btn_proc->setEnabled(false);
+	// turn off all Radio Buttons
+	ui.rb_pid->setAutoExclusive(false); 
+	ui.rb_pid->setChecked(false);
+	ui.rb_proc->setChecked(false);
+	ui.rb_pid->setAutoExclusive(true);
+}
+
 void GuiMain::pick_process()
 {
 	picker->show();
-	emit send_to_picker(*pState);
+	emit send_to_picker(pss, ps_picker);
 }
 
 void GuiMain::procName_change()
 {
-	QString proc = ui.cmb_proc->currentText();
-	process_list pl = getProcessByName(proc.toStdString().c_str());
-	if (pl.pid)
+	if (ui.rb_proc->isChecked())
 	{
-		procType = pl.arch;
-		pState->pid = pl.pid;
-		ui.txt_pid->setText(QString::number(pl.pid));
+		QString proc = ui.cmb_proc->currentText();
+		Process_Struct pl = getProcessByName(proc.toStdString().c_str());
+
+		memcpy(ps_picker, &pl, sizeof(Process_Struct));
+		ui.txt_pid->setText(QString::number(ps_picker->pid));
+		ui.txt_arch->setText(GuiMain::arch_to_str(ps_picker->arch));
+	}
+}
+
+void GuiMain::procID_change()
+{
+	if (ui.rb_pid->isChecked())
+	{
+		Process_Struct pl = getProcessByPID(ui.txt_pid->text().toInt());
+
+		memcpy(ps_picker, &pl, sizeof(Process_Struct));
+		ui.cmb_proc->setCurrentText(ps_picker->name);
+		ui.txt_arch->setText(GuiMain::arch_to_str(ps_picker->arch));
+	}
+}
+
+void GuiMain::get_from_picker(Process_State_Struct* procStateStruct, Process_Struct* procStruct)
+{
+	pss = procStateStruct;
+	ps_picker = procStruct;
+
+	if (ps_picker->pid)
+	{
+		unset_rb();
+		int index = ui.cmb_proc->findText(ps_picker->name);
+		if(index == -1) // check exists
+			ui.cmb_proc->addItem(ps_picker->name);
+		ui.cmb_proc->setCurrentIndex(ui.cmb_proc->findText(ps_picker->name));
+		ui.txt_pid->setText(QString::number(ps_picker->pid));
+		ui.txt_arch->setText(GuiMain::arch_to_str(ps_picker->arch));
+		set_rb_pid();
+	}
+}
+
+void GuiMain::auto_inject()
+{
+	if (ui.cb_auto->isChecked())
+	{
+		// Restart if running
+		timer->start(2000);
+	}
+	else
+	{
+		timer->stop();
+	}
+}
+
+void GuiMain::auto_loop_inject()
+{
+	if (ui.cb_auto->isChecked())
+	{
+		if (ui.rb_proc->isChecked())
+		{
+			QString proc = ui.cmb_proc->currentText();
+			Process_Struct pl = getProcessByName(proc.toStdString().c_str());
+
+			if (pl.pid)
+			{
+				ui.cb_auto->setChecked(false);
+				timer->stop();
+				emit delay_inject();
+				//injec_status(true, "Test Message");
+			}
+		}
+	}
+	else
+	{
+		timer->stop();
 	}
 }
 
 void GuiMain::color_setup()
 {
 	// https://gist.github.com/QuantumCD/6245215
+	// https://github.com/Jorgen-VikingGod/Qt-Frameless-Window-DarkStyle/blob/master/DarkStyle.cpp
 	// Style bullshit
 	qApp->setStyle(QStyleFactory::create("Fusion"));
 	normalPalette = qApp->palette();
@@ -160,7 +260,11 @@ void GuiMain::color_setup()
 	darkPalette.setColor(QPalette::Highlight, QColor(42, 130, 218));
 	darkPalette.setColor(QPalette::HighlightedText, Qt::black);
 
+	darkPalette.setColor(QPalette::Disabled, QPalette::Base, QColor(50, 50, 50));
+	darkPalette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(0, 0, 0));
+
 	darkSheet = ("QToolTip { color: #ffffff; background-color: #2a82da; border: 1px solid white; }");
+	/*ui.cb_auto->setStyleSheet()*/
 
 }
 
@@ -191,9 +295,12 @@ void GuiMain::color_change()
 void GuiMain::reset_settings()
 {
 	// delete file
-	QFile qf("settings.ini");
-	if (qf.exists())
-		qf.remove();
+	QString iniName = QCoreApplication::applicationName() + ".ini";
+	QFile iniFile(iniName);
+	if (iniFile.exists())
+	{
+		iniFile.remove();
+	}
 
 	emit slotReboot();
 }
@@ -206,8 +313,7 @@ void GuiMain::slotReboot()
 
 void GuiMain::save_settings()
 {
-	QSettings settings("settings.ini", QSettings::IniFormat);
-	//settings.beginGroup("FILES");
+	QSettings settings((QCoreApplication::applicationName() + ".ini"), QSettings::IniFormat);
 
 	settings.beginWriteArray("FILES");
 	int i = 0;
@@ -229,48 +335,53 @@ void GuiMain::save_settings()
 	}
 	settings.endArray();
 
-	//settings.endGroup();
-	settings.beginGroup("CONFIG");
-	settings.setValue("PROCESS", ui.cmb_proc->currentIndex());
-	settings.setValue("PID", ui.txt_pid->text());
-	settings.setValue("PROCESSBYNAME", ui.rb_proc->isChecked());
-	settings.setValue("DELAY", ui.txt_delay->text());	
-	settings.setValue("CLOSEONINJ", ui.cb_close->isChecked());
-	settings.setValue("AUTOINJ", ui.cb_auto->isChecked());
-	settings.setValue("METHOD", ui.cmb_load->currentIndex());
-	settings.setValue("LAUNCHMETHOD", ui.cmb_create->currentIndex());
-	settings.setValue("HIJACK", ui.cb_hijack->isChecked());
-	settings.setValue("CLOAK", ui.cb_clock->isChecked());
-	settings.setValue("PEH", ui.cmb_peh->currentIndex());
-	settings.setValue("RANDOMIZE", ui.cb_random->isChecked());
-	settings.setValue("DLLCOPY", ui.cb_copy->isChecked());
-	settings.setValue("ADVANCED", ui.btn_adv->isChecked());
-	settings.setValue("UNLINKPEB", ui.cb_unlink->isChecked());
-	settings.setValue("SHIFTMODULE", ui.cb_shift->isChecked());
-	settings.setValue("CLEANDIR", ui.cb_clean->isChecked());
-	settings.setValue("TOOLTIPSON", ui.btn_tooltip->isChecked());
-	settings.setValue("DARKTHEME", ui.btn_light->isChecked());
 
-	settings.setValue("LASTDIR", lastPathStr);
-	settings.setValue("IGNOREUPDATES", ignoreUpdate);
-	settings.setValue("PROCNAMEFILTER", pState->filter);
-	settings.setValue("CURRENTSESSION", pState->cbSession);
-	settings.setValue("PROCESSTYPE", pState->cmbType);
-	settings.setValue("CURRENTPROCTYPE", procType);
-	settings.setValue("GEOMETRY", saveGeometry());
-	settings.setValue("STATE", saveState());
+	settings.beginGroup("CONFIG");
+	settings.setValue("PROCESS",		ui.cmb_proc->currentIndex());
+	settings.setValue("PID",			ui.txt_pid->text());
+	settings.setValue("PROCESSBYNAME",	ui.rb_proc->isChecked());
+	settings.setValue("DELAY",			ui.txt_delay->text());	
+	settings.setValue("ARCH",			ui.txt_arch->text());	
+	settings.setValue("CLOSEONINJ",		ui.cb_close->isChecked());
+	settings.setValue("AUTOINJ",		ui.cb_auto->isChecked());
+	settings.setValue("METHOD",			ui.cmb_load->currentIndex());
+	settings.setValue("LAUNCHMETHOD",	ui.cmb_create->currentIndex());
+	settings.setValue("HIJACK",			ui.cb_hijack->isChecked());
+	settings.setValue("CLOAK",			ui.cb_clock->isChecked());
+	settings.setValue("PEH",			ui.cmb_peh->currentIndex());
+	settings.setValue("RANDOMIZE",		ui.cb_random->isChecked());
+	settings.setValue("DLLCOPY",		ui.cb_copy->isChecked());
+	settings.setValue("ADVANCED",		ui.btn_adv->isChecked());
+	settings.setValue("UNLINKPEB",		ui.cb_unlink->isChecked());
+	settings.setValue("SHIFTMODULE",	ui.cb_shift->isChecked());
+	settings.setValue("CLEANDIR",		ui.cb_clean->isChecked());
+	settings.setValue("TOOLTIPSON",		ui.btn_tooltip->isChecked());
+	settings.setValue("DARKTHEME",		ui.btn_light->isChecked());
+
+	settings.setValue("LASTDIR",		lastPathStr);
+	settings.setValue("IGNOREUPDATES",	ignoreUpdate);
+	settings.setValue("PROCNAMEFILTER", pss->txtFilter);
+	settings.setValue("PROCESSTYPE",	pss->cmbArch);
+	settings.setValue("CURRENTSESSION", pss->cbSession);
+
+	for (QTreeWidgetItemIterator it2(ui.tree_files); (*it2) != nullptr; ++it2)
+	{
+		// Find Item
+		if ((*it2)->text(0) == "YES")
+		{
+			settings.setValue("ACTIVEDLL", (*it2)->text(1));
+			break;
+		}
+	}
+
+	settings.setValue("GEOMETRY",		saveGeometry());
+	settings.setValue("STATE",			saveState());
 	settings.endGroup();
 }
 
 void GuiMain::load_settings()
 {
-	pState->pid = 0;
-	pState->type = 0;
-	pState->cbSession = true;
-	pState->cmbType = 0;
-	pState->procName = "";
-
-	QSettings settings("settings.ini", QSettings::IniFormat);
+	QSettings settings((QCoreApplication::applicationName() + ".ini"), QSettings::IniFormat);
 
 	int fileSize = settings.beginReadArray("FILES");
 	for (int i = 0; i < fileSize; ++i) {
@@ -286,37 +397,47 @@ void GuiMain::load_settings()
 	}
 	settings.endArray();
 
+
 	settings.beginGroup("CONFIG");
-	ui.cmb_proc->setCurrentIndex(settings.value("PROCESS").toInt());
-	ui.txt_pid->setText(settings.value("PID").toString());
-	ui.rb_proc->setChecked(settings.value("PROCESSBYNAME").toBool());
-	ui.txt_delay->setText(settings.value("DELAY").toString());
-	ui.cb_auto->setChecked(settings.value("AUTOINJ").toBool());
-	ui.cb_close->setChecked(settings.value("CLOSEONINJ").toBool());
-	ui.cmb_load->setCurrentIndex(settings.value("METHOD").toInt());
-	ui.cmb_create->setCurrentIndex(settings.value("LAUNCHMETHOD").toInt());
-	ui.cb_hijack->setChecked(settings.value("HIJACK").toBool());
-	ui.cb_clock->setChecked(settings.value("CLOAK").toBool());
-	ui.cmb_peh->setCurrentIndex(settings.value("PEH").toInt());
-	ui.cb_random->setChecked(settings.value("RANDOMIZE").toBool());
-	ui.cb_copy->setChecked(settings.value("DLLCOPY").toBool());
-	ui.btn_adv->setChecked(settings.value("ADVANCED").toBool());
-	ui.cb_unlink->setChecked(settings.value("UNLINKPEB").toBool());
-	ui.cb_shift->setChecked(settings.value("SHIFTMODULE").toBool());
-	ui.cb_clean->setChecked(settings.value("CLEANDIR").toBool());
-	ui.btn_tooltip->setChecked(settings.value("TOOLTIPSON").toBool());
-	ui.btn_light->setChecked(settings.value("DARKTHEME").toBool());
+	ui.cmb_proc		->setCurrentIndex(settings.value("PROCESS").toInt());
+	ui.txt_pid		->setText(settings.value("PID").toString());
+	ui.rb_proc		->setChecked(settings.value("PROCESSBYNAME").toBool());
+	ui.txt_delay	->setText(settings.value("DELAY").toString());
+	ui.txt_arch		->setText(settings.value("ARCH").toString());
+	ui.cb_auto		->setChecked(settings.value("AUTOINJ").toBool());
+	ui.cb_close		->setChecked(settings.value("CLOSEONINJ").toBool());
+	ui.cmb_load		->setCurrentIndex(settings.value("METHOD").toInt());
+	ui.cmb_create	->setCurrentIndex(settings.value("LAUNCHMETHOD").toInt());
+	ui.cb_hijack	->setChecked(settings.value("HIJACK").toBool());
+	ui.cb_clock		->setChecked(settings.value("CLOAK").toBool());
+	ui.cmb_peh		->setCurrentIndex(settings.value("PEH").toInt());
+	ui.cb_random	->setChecked(settings.value("RANDOMIZE").toBool());
+	ui.cb_copy		->setChecked(settings.value("DLLCOPY").toBool());
+	ui.btn_adv		->setChecked(settings.value("ADVANCED").toBool());
+	ui.cb_unlink	->setChecked(settings.value("UNLINKPEB").toBool());
+	ui.cb_shift		->setChecked(settings.value("SHIFTMODULE").toBool());
+	ui.cb_clean		->setChecked(settings.value("CLEANDIR").toBool());
+	ui.btn_tooltip	->setChecked(settings.value("TOOLTIPSON").toBool());
+	ui.btn_light	->setChecked(settings.value("DARKTHEME").toBool());
 
 	lastPathStr			= settings.value("LASTDIR").toString();
 	ignoreUpdate		= settings.value("IGNOREUPDATES").toBool();
-	pState->filter		= settings.value("PROCNAMEFILTER").toString();
-	pState->cmbType		= settings.value("PROCESSTYPE").toInt();
-	pState->cbSession	= settings.value("CURRENTSESSION").toBool();
-	procType			= settings.value("CURRENTPROCTYPE").toInt();
-	restoreGeometry(settings.value("GEOMETRY").toByteArray());
-	restoreState(settings.value("STATE").toByteArray());
+	pss->txtFilter		= settings.value("PROCNAMEFILTER").toString();
+	pss->cmbArch		= settings.value("PROCESSTYPE").toInt();
+	pss->cbSession		= settings.value("CURRENTSESSION").toBool();
 
-	//settings.value("PROCESSTYPE", ui.txt_pid->text());
+	for (QTreeWidgetItemIterator it2(ui.tree_files); (*it2) != nullptr; ++it2)
+	{
+		// Find Item
+		if ((*it2)->text(1) == settings.value("ACTIVEDLL").toString())
+		{
+			(*it2)->setText(0, "YES");
+			break;
+		}
+	}
+
+	restoreGeometry	(settings.value("GEOMETRY").toByteArray());
+	restoreState	(settings.value("STATE").toByteArray());
 	settings.endGroup();
 }
 
@@ -375,6 +496,226 @@ void GuiMain::adv_change()
 	}
 }
 
+void GuiMain::add_file_dialog()
+{
+	QFileDialog fileDialog(this, "Select dll files");
+	fileDialog.setFileMode(QFileDialog::ExistingFiles);
+	fileDialog.setNameFilter("Dynamic Link Libraries (*.dll)");
+	fileDialog.setWindowFilePath(lastPathStr);
+	fileDialog.exec();
+	QStringList list(fileDialog.selectedFiles());
+
+	for (auto l : list)
+		GuiMain::add_file_to_list(l);
+
+	lastPathStr = fileDialog.windowFilePath();
+}
+
+void GuiMain::add_file_to_list(QString str)
+{
+	QFileInfo fi(str);
+	QTreeWidgetItem* item = new QTreeWidgetItem(ui.tree_files);
+
+	item->setText(1, fi.fileName());
+	item->setText(2, fi.absoluteFilePath());
+	int arch = (int)getFileArch(fi.absoluteFilePath().toStdString().c_str());
+	item->setText(3, arch_to_str(arch));
+}
+
+void GuiMain::remove_file()
+{
+	QTreeWidgetItem* item = ui.tree_files->currentItem();
+	delete item;
+}
+
+
+void GuiMain::select_file()
+{
+	QTreeWidgetItem* it2 = ui.tree_files->currentItem();
+
+	QTreeWidgetItemIterator it(ui.tree_files);
+	while (*it)
+	{
+		(*it)->setText(0, "");
+		++it;
+	}
+
+	it2->setText(0, "YES");
+}
+
+void GuiMain::delay_inject()
+{
+	int delay = ui.txt_delay->text().toInt();
+	if (delay > 0)
+	{
+		delayInjTimer->start(delay);
+	}
+	else
+	{
+		emit inject_file();
+	}
+}
+
+
+void GuiMain::inject_file()
+{
+	INJECTIONDATAA data;
+	memset(&data, 0, sizeof(INJECTIONDATAA));
+
+	//Process_Struct ps_inject;
+	//memset(&ps_inject, 0, sizeof(Process_Struct));
+
+	int fileType	= NONE;
+	int processType = NONE;
+
+
+	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
+	{
+		// Find Item
+		if ((*it)->text(0) != "YES")
+			continue;
+
+		// Convert String
+		QString fileStr	= (*it)->text(2);
+		for (int i = 0, j = 0; fileStr[i].toLatin1() != '\0'; i++, j++)
+		{
+			if (fileStr[i] == '\/')
+				data.szDllPath[j] = '\\';
+			else
+				data.szDllPath[j] = fileStr[i].toLatin1();		
+		}
+		
+		// Check Existens
+		QFile qf(fileStr);
+		if (!qf.exists())
+		{
+			emit injec_status(false, "File not found");
+			return;
+		}
+
+		// Check Architecture
+		fileType = str_to_arch((*it)->text(3));
+		if (fileType == NONE)
+		{
+			emit injec_status(false, "File Architecture invalid");
+			return;
+		}
+	}
+
+	// Check File Selected
+	if (fileType == NONE)
+	{
+		emit injec_status(false, "File not selected");
+		return;
+	}
+
+	// Process ID
+	if (ui.rb_pid->isChecked())
+	{
+		int id = ui.txt_pid->text().toInt();
+		if (id)
+		{
+			data.ProcessID = id;
+			processType = getProcArch(id);
+		}
+		else
+		{
+			emit injec_status(false, "Invalid PID");
+			return;
+		}
+	}
+	else // Process Name
+	{
+		
+		int index = ui.cmb_proc->currentIndex();
+		Process_Struct p = getProcessByName(ui.cmb_proc->itemText(index).toStdString().c_str());
+		if (p.pid)
+		{
+			data.ProcessID = p.pid;
+			processType = p.arch;		
+		}
+		else
+		{
+			emit injec_status(false, "Invalid Process Name");
+			return;
+		}
+	}
+
+	if (processType != fileType || processType == NULL || fileType == NULL)
+	{
+		emit injec_status(false, "File and Process are incompatible");
+		return;
+	}
+
+	data.Mode	= INJECTION_MODE::IM_LoadLibrary;
+	data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;
+
+	if (ui.cmb_peh->currentIndex() == 1)	data.Flags |= INJ_ERASE_HEADER;
+	if (ui.cmb_peh->currentIndex() == 2)	data.Flags |= INJ_FAKE_HEADER;
+	if (ui.cb_unlink->isChecked())			data.Flags |= INJ_UNLINK_FROM_PEB;
+	if (ui.cb_shift->isChecked())			data.Flags |= INJ_SHIFT_MODULE;
+	if (ui.cb_clean->isChecked())			data.Flags |= INJ_CLEAN_DATA_DIR;
+	if (ui.cb_clock->isChecked())			data.Flags |= INJ_THREAD_CREATE_CLOAKED;
+	if (ui.cb_random->isChecked())			data.Flags |= INJ_SCRAMBLE_DLL_NAME;
+	if (ui.cb_copy->isChecked())			data.Flags |= INJ_LOAD_DLL_COPY;
+	if (ui.cb_hijack->isChecked())			data.Flags |= INJ_HIJACK_HANDLE;
+	
+	//HINSTANCE	hinstLib = LoadLibraryA("C:\\Users\\kage\\Downloads\\GuidedHacking-Injector-master\\GuidedHacking-Injector-master\\GH Injector Library\\Release\\x64\\GH Injector - x64.dll");
+
+	HINSTANCE hinstLib = LoadLibraryA("GH Injector - x64.dll");
+	if (hinstLib == NULL)
+	{
+		emit injec_status(false, "GH Injector - x64.dll not found");
+		return;
+	}
+
+	InjectA	injectFunc = (InjectA)GetProcAddress(hinstLib, "InjectA");
+	if (injectFunc == NULL)
+	{
+		BOOL fFreeResult = FreeLibrary(hinstLib);
+		emit injec_status(false, "InjectA not found");
+		return;
+	}
+
+	DWORD res = injectFunc(&data);
+	if (res)
+	{
+		BOOL fFreeResult = FreeLibrary(hinstLib);
+		QString errorCode("\nLast Errorcode" + QString::number(data.LastErrorCode));
+		emit injec_status(false, "InjectA failed with " + errorCode);
+		return;
+	}
+
+	if (ui.cb_close->isChecked())
+	{
+		qApp->exit(0);
+		return;
+	}
+
+	emit injec_status(true, "Sucess Injection");
+	return;
+}
+
+void GuiMain::injec_status(bool ok, QString msg)
+{
+	if(ok)
+	{
+		QMessageBox messageBox;
+		messageBox.information(0, "Success", msg);
+		messageBox.setFixedSize(500, 200);
+
+		if (ui.cb_close->isChecked())
+		{
+			this->close();
+		}
+	}
+	else
+	{
+		QMessageBox messageBox;
+		messageBox.critical(0, "Error", msg);
+		messageBox.setFixedSize(500, 200);
+	}
+}
 
 
 void GuiMain::tooltip_change()
@@ -455,7 +796,7 @@ void GuiMain::check_version()
 
 	//QUrl url_ver("http://guidedhacking.com/gh/inj");
 	//QString ver = url_ver.query();
-	
+
 	//QUrl url_download("http://guidedhacking.com/gh/inj/V" + ver + "/GH Injector.zip");
 }
 
@@ -472,235 +813,5 @@ void GuiMain::replyFinished(QNetworkReply* reply)
 	{
 		ui.btn_version->setText("failed");
 	}
-	
-}
 
-void GuiMain::add_file_dialog()
-{
-	QFileDialog fileDialog(this, "Select dll files");
-	fileDialog.setNameFilter("Dynamic Link Libraries (*.dll)");
-	fileDialog.setWindowFilePath(lastPathStr);
-	fileDialog.exec();
-	lastPathStr = fileDialog.windowFilePath();
-	QStringList list(fileDialog.selectedFiles());
-
-	for (auto l : list)
-		GuiMain::add_file_to_list(l);
-}
-
-void GuiMain::add_file_to_list(QString str)
-{
-	QFileInfo fi(str);
-	QTreeWidgetItem* item = new QTreeWidgetItem(ui.tree_files);
-
-	item->setText(1, fi.fileName());
-	item->setText(2, fi.absoluteFilePath());
-	int arch = getFileArch(fi.absoluteFilePath().toStdString().c_str());
-	item->setText(3, arch_to_str(arch));
-}
-
-void GuiMain::remove_file()
-{
-	QTreeWidgetItem* item = ui.tree_files->currentItem();
-	delete item;
-
-}
-
-
-void GuiMain::select_file()
-{
-	QTreeWidgetItem* it2 = ui.tree_files->currentItem();
-
-	QTreeWidgetItemIterator it(ui.tree_files);
-	while (*it)
-	{
-		(*it)->setText(0, "");
-		++it;
-	}
-
-	it2->setText(0, "YES");
-}
-
-void GuiMain::get_from_picker(procState state)
-{
-	if (state.pid)
-	{
-		ui.cmb_proc->addItem(state.procName);
-		ui.txt_pid->setText(QString::number(state.pid));
-		procType = state.type;
-		set_rb_pid();
-	}
-	*pState = state;
-}
-
-void GuiMain::inject_file()
-{
-	INJECTIONDATAA data;
-	memset(&data, 0, sizeof(INJECTIONDATAA));
-
-	int fileType	= NONE;
-	int processType = NONE;
-
-
-	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
-	{
-		// Find Item
-		if ((*it)->text(0) != "YES")
-			continue;
-
-		// Convert String
-		QString fileStr	= (*it)->text(2);
-		for (int i = 0, j = 0; fileStr[i].toLatin1() != '\0'; i++, j++)
-		{
-			if (fileStr[i] == '\/')
-				data.szDllPath[j] = '\\';
-			else
-				data.szDllPath[j] = fileStr[i].toLatin1();		
-		}
-		
-		// Check Existens
-		QFile qf(fileStr);
-		if (!qf.exists())
-		{
-			emit injec_status(false, "File not found");
-			return;
-		}
-
-		// Check Architecture
-		fileType = str_to_arch((*it)->text(3));
-		if (fileType == NONE)
-		{
-			emit injec_status(false, "File Architecture invalid");
-			return;
-		}
-	}
-
-	// Check File Selected
-	if (fileType == NONE)
-	{
-		emit injec_status(false, "File not selected");
-		return;
-	}
-
-	// Process ID
-	if (ui.rb_pid->isChecked())
-	{
-		int id = ui.txt_pid->text().toInt();
-		if (id)
-		{
-			data.ProcessID = id;
-			processType = getProcArch(id);
-		}
-		else
-		{
-			emit injec_status(false, "Invalid PID");
-			return;
-		}
-	}
-	else // Process Name
-	{
-		
-		int index = ui.cmb_proc->currentIndex();
-		process_list p = getProcessByName(ui.cmb_proc->itemText(index).toStdString().c_str());
-		if (p.pid)
-		{
-			data.ProcessID = p.pid;
-			processType = p.arch;		
-		}
-		else
-		{
-			emit injec_status(false, "Invalid Process Name");
-			return;
-		}
-	}
-
-	if (processType != fileType || processType == NULL || fileType == NULL)
-	{
-		emit injec_status(false, "File and Process are incompatible");
-		return;
-	}
-
-	data.Mode	= INJECTION_MODE::IM_LoadLibrary;
-	data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;
-
-	if (ui.cmb_peh->currentIndex() == 1)	data.Flags |= INJ_ERASE_HEADER;
-	if (ui.cmb_peh->currentIndex() == 2)	data.Flags |= INJ_FAKE_HEADER;
-	if (ui.cb_unlink->isChecked())			data.Flags |= INJ_UNLINK_FROM_PEB;
-	if (ui.cb_shift->isChecked())			data.Flags |= INJ_SHIFT_MODULE;
-	if (ui.cb_clean->isChecked())			data.Flags |= INJ_CLEAN_DATA_DIR;
-	if (ui.cb_clock->isChecked())			data.Flags |= INJ_THREAD_CREATE_CLOAKED;
-	if (ui.cb_random->isChecked())			data.Flags |= INJ_SCRAMBLE_DLL_NAME;
-	if (ui.cb_copy->isChecked())			data.Flags |= INJ_LOAD_DLL_COPY;
-	if (ui.cb_hijack->isChecked())			data.Flags |= INJ_HIJACK_HANDLE;
-
-
-	int delay = ui.txt_delay->text().toInt();
-	if (delay > 0)
-	{
-		QThread::sleep(10);
-	}
-	
-	//HINSTANCE	hinstLib = LoadLibraryA("C:\\Users\\kage\\Downloads\\GuidedHacking-Injector-master\\GuidedHacking-Injector-master\\GH Injector Library\\Release\\x64\\GH Injector - x64.dll");
-
-	HINSTANCE hinstLib = LoadLibraryA("GH Injector - x64.dll");
-	if (hinstLib == NULL)
-	{
-		emit injec_status(false, "GH Injector - x64.dll not found");
-		return;
-	}
-
-	InjectA	injectFunc = (InjectA)GetProcAddress(hinstLib, "InjectA");
-	if (injectFunc == NULL)
-	{
-		BOOL fFreeResult = FreeLibrary(hinstLib);
-		emit injec_status(false, "InjectA not found");
-		return;
-	}
-
-	DWORD res = injectFunc(&data);
-	if (res)
-	{
-		BOOL fFreeResult = FreeLibrary(hinstLib);
-		QString errorCode("\nLast Errorcode" + QString::number(data.LastErrorCode));
-		emit injec_status(false, "InjectA failed with " + errorCode);
-		return;
-	}
-
-	if (ui.cb_close->isChecked())
-	{
-		qApp->exit(0);
-		return;
-	}
-
-	emit injec_status(true, "Sucess Injection");
-	return;
-}
-
-void GuiMain::injec_status(bool ok, QString msg)
-{
-	if(ok)
-	{
-		QMessageBox messageBox;
-		messageBox.information(0, "Success", msg);
-		messageBox.setFixedSize(500, 200);
-
-		if (ui.cb_close->isChecked())
-		{
-			this->close();
-		}
-	}
-	else
-	{
-		QMessageBox messageBox;
-		messageBox.critical(0, "Error", msg);
-		messageBox.setFixedSize(500, 200);
-	}
-}
-
-void GuiMain::auto_inject()
-{
-	if (ui.cb_auto->isChecked())
-	{
-		inject_file();
-	}
 }

@@ -59,10 +59,10 @@
        <property name="sortingEnabled">
         <bool>true</bool>
        </property>
-       <attribute name="headerMinimumSectionSize">
+       <attribute name="headerDefaultSectionSize">
         <number>40</number>
        </attribute>
-       <attribute name="headerDefaultSectionSize">
+       <attribute name="headerMinimumSectionSize">
         <number>40</number>
        </attribute>
        <attribute name="headerStretchLastSection">
@@ -96,10 +96,10 @@
          <string>123456</string>
         </property>
         <property name="text">
-         <string>xxxxxxxxxxxxxxxxxxxxxxxxx</string>
+         <string>xxxxxxxxxxxxxxxxxxxxxxx</string>
         </property>
         <property name="text">
-         <string>x86x</string>
+         <string>NONE</string>
         </property>
        </item>
       </widget>

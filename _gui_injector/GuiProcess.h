@@ -2,15 +2,13 @@
 
 #include <QWidget>
 #include "ui_GuiProcess.h"
+#include "Process.h"
 
-struct procState
+struct Process_State_Struct
 {
-	int		pid;
-	QString procName;
-	int		type;
-	QString filter;
-	int		cmbType;
-	bool	cbSession;
+	QString			txtFilter;
+	int				cmbArch;
+	bool			cbSession;
 };
 
 class GuiProcess : public QWidget
@@ -23,16 +21,20 @@ public:
 
 private:
 	Ui::frm_proc ui;
+	Process_State_Struct*	pss;
+	Process_Struct*			ps;
+	void refresh_gui();
 
 signals:
-	void send_to_inj(procState state);
+	void send_to_inj(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
 
 public slots:
-	void get_from_inj(procState state);
+	void get_from_inj(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
 
 private slots:
+	
 	void refresh_process();
 	void filter_change(int i);
-	void nameChanged(const QString&);
+	void name_change(const QString&);
 	void proc_select();
 };

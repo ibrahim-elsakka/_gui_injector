@@ -7,14 +7,15 @@ enum ARCH
     X86
 };
 
-struct process_list
+struct Process_Struct
 {
     unsigned long   pid;
     char            name[100];
     int             arch;
 };
 
-int getFileArch(const char* szDllFile);
-bool getProcessList(std::vector<process_list>& pl);
-process_list getProcessByName(const char* name);
-int getProcArch(int pid);
+enum ARCH getFileArch(const char* szDllFile);
+enum ARCH getProcArch(const int pid);
+Process_Struct getProcessByName(const char* name);
+Process_Struct getProcessByPID(const int pid);
+bool getProcessList(std::vector<Process_Struct>& pl);
