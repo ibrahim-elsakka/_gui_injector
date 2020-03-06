@@ -6,8 +6,6 @@
 #include <qpixmap.h>
 #include <qstylefactory.h>
 #include <qsettings.h>
-#include <qthread.h>
-
 
 #include <string>
 #include "Banner.h"

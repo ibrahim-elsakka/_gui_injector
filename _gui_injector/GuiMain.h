@@ -3,7 +3,6 @@
 #include <QtWidgets/QMainWindow>
 #include <qnetworkaccessmanager.h>
 #include <qnetworkreply.h>
-#include <qthread.h>
 #include <qtimer.h>
 
 #include "ui_GuiMain.h"
