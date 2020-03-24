@@ -23,7 +23,6 @@ private:
 	Ui::frm_proc ui;
 	Process_State_Struct*	pss;
 	Process_Struct*			ps;
-	void refresh_gui();
 
 signals:
 	void send_to_inj(Process_State_Struct* procStateStruct, Process_Struct* procStruct);
@@ -33,6 +32,7 @@ public slots:
 
 private slots:
 	
+	void refresh_gui();
 	void refresh_process();
 	void filter_change(int i);
 	void name_change(const QString&);

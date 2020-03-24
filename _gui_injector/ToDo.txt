@@ -1,2 +1,6 @@
 ToDo:
 - Remove Color Change
+- update function
+- Current Session
+
+- auto inject delay?

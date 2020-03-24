@@ -200,3 +200,42 @@ bool getProcessList(std::vector<Process_Struct>& pl)
     CloseHandle(hSnapshot);
     return true;
 }
+
+bool SetDebugPrivilege(bool Enable)
+{
+    HANDLE hToken = 0;
+    TOKEN_PRIVILEGES tkp = { 0 };
+
+    // Get a token for this process.
+    BOOL bOpt = OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hToken);
+    if (!bOpt)
+    {
+        return FALSE;
+    }
+
+    // Get the LUID for the privilege. 
+    BOOL bLpv = LookupPrivilegeValue(NULL, L"SeDebugPrivilege", &tkp.Privileges[0].Luid);
+    if (!bLpv)
+    {
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    tkp.PrivilegeCount = 1;  // one privilege to set
+    if (Enable)
+        tkp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    else
+        tkp.Privileges[0].Attributes = SE_PRIVILEGE_USED_FOR_ACCESS;
+
+
+    // Set the privilege for this process. 
+    BOOL bAtp = AdjustTokenPrivileges(hToken, FALSE, &tkp, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, 0);
+    if (!bAtp)
+    {
+        CloseHandle(hToken);
+        return FALSE;
+    }
+
+    CloseHandle(hToken);
+    return TRUE;
+}

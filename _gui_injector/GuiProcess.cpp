@@ -55,6 +55,7 @@ void GuiProcess::refresh_gui()
 	if (txt.isEmpty())
 		return;
 
+	
 	QTreeWidgetItemIterator it2(ui.tree_process);
 	while (*it2)
 	{
@@ -68,6 +69,17 @@ void GuiProcess::refresh_gui()
 		}
 		++it2;
 	}
+
+	int processCount = 0;
+	QTreeWidgetItemIterator it3(ui.tree_process);
+	while (*it3)
+	{
+		if (!(*it3)->isHidden())
+			processCount++;
+		++it3;
+	}
+
+	this->setWindowTitle("Select a process (" + QString::number(processCount) + ')');
 }
 
 void GuiProcess::refresh_process()
@@ -86,17 +98,17 @@ void GuiProcess::refresh_process()
 		item->setText(3, GuiMain::arch_to_str(proc.arch));
 	}
 
-	refresh_gui();
+	emit refresh_gui();
 }
 
 void GuiProcess::filter_change(int i)
 {
-	refresh_gui();
+	emit refresh_gui();
 }
 
 void GuiProcess::name_change(const QString& str)
 {
-	refresh_gui();
+	emit refresh_gui();
 }
 
 void GuiProcess::proc_select()
