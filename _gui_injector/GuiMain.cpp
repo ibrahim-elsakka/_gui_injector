@@ -882,13 +882,18 @@ void GuiMain::replyFinished(QNetworkReply* reply)
 	QByteArray bytes = reply->readAll();
 	QString str = QString::fromUtf8(bytes.data(), bytes.size());
 	int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
-	if (statusCode == 200)
-	{
-		ui.btn_version->setText("Version " + str);
-	}
-	else
-	{
-		ui.btn_version->setText("failed");
-	}
 
+	if (reply->error() != QNetworkReply::NoError)
+		ui.btn_version->setText("error");
+
+	else if (statusCode == 200)
+		ui.btn_version->setText("Version " + str);
+
+	else if (statusCode == 0)
+		ui.btn_version->setText("redirect " + str);
+
+	else
+		ui.btn_version->setText("http " + QString::number(statusCode));
+
+	return;
 }

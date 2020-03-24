@@ -33,7 +33,9 @@ private:
 	QString	 darkSheet;
 
 	// Network
-	QNetworkAccessManager* n_Manager;
+	QNetworkAccessManager*	n_Manager;
+	QNetworkAccessManager	manager;
+	QVector<QNetworkReply*> currentDownloads;
 
 	// Settings
 	Process_State_Struct*	pss;
@@ -98,4 +100,5 @@ private slots:
 	void open_log();
 	void check_version();
 	void replyFinished(QNetworkReply* rep);
+
 };

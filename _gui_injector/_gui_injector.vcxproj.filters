@@ -40,12 +40,21 @@
     <ClCompile Include="Banner.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
+    <ClCompile Include="DownloadManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Compress.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="GuiMain.h">
       <Filter>Header Files</Filter>
     </QtMoc>
     <QtMoc Include="GuiProcess.h">
+      <Filter>Header Files</Filter>
+    </QtMoc>
+    <QtMoc Include="DownloadManager.h">
       <Filter>Header Files</Filter>
     </QtMoc>
   </ItemGroup>
@@ -71,6 +80,9 @@
     </ClInclude>
     <ClInclude Include="Banner.h">
       <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Compress.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
