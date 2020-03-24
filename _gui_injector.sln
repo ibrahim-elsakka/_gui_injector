@@ -7,17 +7,35 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "_gui_injector", "_gui_injec
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
 		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Win32 = Release|Win32
 		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+		Static|Win32 = Static|Win32
 		Static|x64 = Static|x64
+		Static|x86 = Static|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Debug|Win32.ActiveCfg = Debug|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Debug|Win32.Build.0 = Debug|Win32
 		{30856622-134A-4871-8FB6-48051DE4E0C9}.Debug|x64.ActiveCfg = Debug|x64
 		{30856622-134A-4871-8FB6-48051DE4E0C9}.Debug|x64.Build.0 = Debug|x64
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Debug|x86.ActiveCfg = Debug|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Debug|x86.Build.0 = Debug|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Release|Win32.ActiveCfg = Release|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Release|Win32.Build.0 = Release|Win32
 		{30856622-134A-4871-8FB6-48051DE4E0C9}.Release|x64.ActiveCfg = Release|x64
 		{30856622-134A-4871-8FB6-48051DE4E0C9}.Release|x64.Build.0 = Release|x64
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Release|x86.ActiveCfg = Release|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Release|x86.Build.0 = Release|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Static|Win32.ActiveCfg = Static|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Static|Win32.Build.0 = Static|Win32
 		{30856622-134A-4871-8FB6-48051DE4E0C9}.Static|x64.ActiveCfg = Static|x64
 		{30856622-134A-4871-8FB6-48051DE4E0C9}.Static|x64.Build.0 = Static|x64
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Static|x86.ActiveCfg = Static|Win32
+		{30856622-134A-4871-8FB6-48051DE4E0C9}.Static|x86.Build.0 = Static|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
