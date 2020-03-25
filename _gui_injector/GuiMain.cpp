@@ -85,7 +85,7 @@ GuiMain::GuiMain(QWidget* parent)
 	color_change();
 	load_change(42);
 	create_change(42);
-	check_online_version();
+	//check_online_version();
 
 	// Reduze Height
 	QSize winSize = this->size();
@@ -931,6 +931,13 @@ void GuiMain::download_start()
 	QUrl url(argument);
 	zipName = dl_Manager.saveFileName(url);
 
+	QString strCurDir = QFileInfo(zipName).absolutePath();
+	QDir dirCurDir(strCurDir);
+
+	if (dirCurDir.exists("GH Injector"))
+		dirCurDir.remove("GH Injector");
+
+	dirCurDir.mkdir("GH Injector");
 
 	dl_Manager.append(argument);
 }
@@ -939,25 +946,18 @@ void GuiMain::download_finish()
 {
 	ui.btn_version->setText("download finished");
 
+	QString strCurDir = QFileInfo(zipName).absolutePath();
+	QDir dirCurDir(strCurDir);
+
 	QFile zipFile(zipName);
 	if (!zipFile.exists())
 	{
 		ui.btn_version->setText(".zip not found");
 		return;
 	}
-
-	QString curDir = QFileInfo(zipName).absolutePath();
 	
-	int i = zipName.indexOf('.');
-	QString strFolder(zipName.begin(),i);
-	QDir dirFolder(curDir);
-	dirFolder.mkdir(strFolder);
-	if (!dirFolder.exists())
-	{
-		ui.btn_version->setText("no folder");
-		return;
-	}
-	std::wstring wStr = dirFolder.path().toStdWString();
+
+	std::wstring wStr = dirCurDir.path().toStdWString();
 	std::wstring wStr2;
 	wStr2.reserve(MAX_PATH);
 	auto w = wStr.begin();
@@ -973,12 +973,11 @@ void GuiMain::download_finish()
 		}
 		w++;
 	}
-
 	
-	std::wstring subFolder = wStr2 + L"\\" + strFolder.toStdWString() + L"\\\0\0";
+	std::wstring subFolder = wStr2 + L"\\" + L"GH Injector" + L"\\\0\0";
 	std::wstring zipFullPath = wStr2 + L"\\" + zipName.toStdWString() + L"\\\0\0";
+	
 	WCHAR buf1[MAX_PATH], buf2[MAX_PATH];
-
 	wcscpy(buf1, subFolder.c_str());
 	wcscpy(buf2, zipFullPath.c_str());
 
@@ -995,5 +994,6 @@ void GuiMain::download_finish()
 	}
 	ui.btn_version->setText("unzip complete");
 
+	ui.btn_version->setText("finished");
 	return;
 }
