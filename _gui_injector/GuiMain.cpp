@@ -6,11 +6,13 @@
 #include <qpixmap.h>
 #include <qstylefactory.h>
 #include <qsettings.h>
+#include <qdir.h>
 
 #include <string>
 #include "Banner.h"
 #include "Process.h"
 #include "Injection.h"
+#include "Compress.h"
 
 int const GuiMain::EXIT_CODE_REBOOT = -123456789;
 
@@ -46,11 +48,13 @@ GuiMain::GuiMain(QWidget* parent)
 	connect(ui.btn_tooltip, SIGNAL(clicked()), this, SLOT(tooltip_change()));
 	connect(ui.btn_help,    SIGNAL(clicked()), this, SLOT(open_help()));
 	connect(ui.btn_log,     SIGNAL(clicked()), this, SLOT(open_log()));
-	connect(ui.btn_version, SIGNAL(clicked()), this, SLOT(check_version()));
+	connect(ui.btn_version, SIGNAL(clicked()), this, SLOT(check_online_version()));
 
+	// Update
+	QObject::connect(&dl_Manager, SIGNAL(finished()), this, SLOT(download_finish()));
 
 	gui_Picker  = new GuiProcess();
-	n_Manager   = new QNetworkAccessManager(this);
+	ver_Manager   = new QNetworkAccessManager(this);
 	t_Auto_Inj  = new QTimer(this);
 	t_Delay_Inj = new QTimer(this);
 	pss         = new Process_State_Struct;
@@ -63,7 +67,7 @@ GuiMain::GuiMain(QWidget* parent)
 	memset(ps_picker, 0, sizeof(Process_Struct));
 	lightMode = false;
 
-	connect(n_Manager,	&QNetworkAccessManager::finished, this, &GuiMain::replyFinished);
+	connect(ver_Manager,	&QNetworkAccessManager::finished, this, &GuiMain::replyFinished);
 	connect(this,		SIGNAL(send_to_picker(Process_State_Struct*, Process_Struct*)), 
 			gui_Picker, SLOT(get_from_inj(Process_State_Struct*, Process_Struct*)));
 	connect(gui_Picker, SIGNAL(send_to_inj(Process_State_Struct*, Process_Struct*)), 
@@ -81,7 +85,7 @@ GuiMain::GuiMain(QWidget* parent)
 	color_change();
 	load_change(42);
 	create_change(42);
-	check_version();
+	check_online_version();
 
 	// Reduze Height
 	QSize winSize = this->size();
@@ -95,7 +99,7 @@ GuiMain::GuiMain(QWidget* parent)
 GuiMain::~GuiMain()
 {
 	delete gui_Picker;
-	delete n_Manager;
+	delete ver_Manager;
 	delete t_Auto_Inj;
 	delete t_Delay_Inj;
 	delete pss;
@@ -860,21 +864,17 @@ void GuiMain::open_log()
 	bool ok = QDesktopServices::openUrl(QUrl("https://pastebin.com/eN7KPX3x", QUrl::TolerantMode));
 }
 
-void GuiMain::check_version()
+void GuiMain::check_online_version()
 {
-	ui.btn_version->setText("&Version " + QString(GH_INJ_VERSIONA));
-	if (ignoreUpdate)
-		return;
 
-	ui.btn_version->setText("loading...");
+	ui.btn_version->setText("check version...");
 	ui.btn_version->setEnabled(false);
-
-	n_Manager->get(QNetworkRequest(QUrl("https://guidedhacking.com/gh/inj/")));
-
-	//QUrl url_ver("http://guidedhacking.com/gh/inj");
-	//QString ver = url_ver.query();
-
-	//QUrl url_download("http://guidedhacking.com/gh/inj/V" + ver + "/GH Injector.zip");
+#ifdef _DEBUG
+	ver_Manager->get(QNetworkRequest(QUrl("http://nas:80/gh_version.html")));
+#else
+	ver_Manager->get(QNetworkRequest(QUrl("https://guidedhacking.com/gh/inj/")));
+#endif // _DEBUG	
+	return;	
 }
 
 void GuiMain::replyFinished(QNetworkReply* reply)
@@ -884,16 +884,116 @@ void GuiMain::replyFinished(QNetworkReply* reply)
 	int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
 
 	if (reply->error() != QNetworkReply::NoError)
-		ui.btn_version->setText("error");
+		ui.btn_version->setText("Error: no SSL");
 
 	else if (statusCode == 200)
-		ui.btn_version->setText("Version " + str);
+	{
+		onlineVersion = str;
+		emit download_start();
+	}
 
 	else if (statusCode == 0)
-		ui.btn_version->setText("redirect " + str);
+		ui.btn_version->setText("Fail: redirect " + str);
 
 	else
-		ui.btn_version->setText("http " + QString::number(statusCode));
+		ui.btn_version->setText("Fail: http " + QString::number(statusCode));
+
+	return;
+}
+
+void GuiMain::download_start()
+{
+	if (onlineVersion.isEmpty())
+	{
+		ui.btn_version->setText("Fail: no version");
+		return;
+	}
+
+	if (onlineVersion == QString(GH_INJ_VERSIONA))
+	{
+		ui.btn_version->setText("&Version " + QString(GH_INJ_VERSIONA));
+		return;
+	}
+
+	if (QFile("GH Injector.zip").exists())
+		QFile("GH Injector.zip").remove();
+
+	ui.btn_version->setText("Updating to V" + onlineVersion);
+
+#ifdef _DEBUG
+	QString argument("http://nas:80/" + onlineVersion + "/GH Injector.zip");
+#else
+	QString argument("https://guidedhacking.com/gh/inj/V" + onlineVersion + "/GH Injector.zip");
+	//QUrl url("http://speedtest.tele2.net/1MB.zip");
+#endif // _DEBUG
+	
+	
+	QUrl url(argument);
+	zipName = dl_Manager.saveFileName(url);
+
+
+	dl_Manager.append(argument);
+}
+
+void GuiMain::download_finish()
+{
+	ui.btn_version->setText("download finished");
+
+	QFile zipFile(zipName);
+	if (!zipFile.exists())
+	{
+		ui.btn_version->setText(".zip not found");
+		return;
+	}
+
+	QString curDir = QFileInfo(zipName).absolutePath();
+	
+	int i = zipName.indexOf('.');
+	QString strFolder(zipName.begin(),i);
+	QDir dirFolder(curDir);
+	dirFolder.mkdir(strFolder);
+	if (!dirFolder.exists())
+	{
+		ui.btn_version->setText("no folder");
+		return;
+	}
+	std::wstring wStr = dirFolder.path().toStdWString();
+	std::wstring wStr2;
+	wStr2.reserve(MAX_PATH);
+	auto w = wStr.begin();
+	while (w != wStr.end())
+	{
+		if (*w == '\/')
+		{
+			wStr2.append(L"\\");
+		}
+		else
+		{
+			wStr2 += *w;
+		}
+		w++;
+	}
+
+	
+	std::wstring subFolder = wStr2 + L"\\" + strFolder.toStdWString() + L"\\\0\0";
+	std::wstring zipFullPath = wStr2 + L"\\" + zipName.toStdWString() + L"\\\0\0";
+	WCHAR buf1[MAX_PATH], buf2[MAX_PATH];
+
+	wcscpy(buf1, subFolder.c_str());
+	wcscpy(buf2, zipFullPath.c_str());
+
+	ui.btn_version->setText("unzip...");
+	try
+	{		
+		Compress c;
+		c.unzip_GH(buf2, buf1);
+	}
+	catch (...)
+	{
+		ui.btn_version->setText("unzip failed");
+		return;
+	}
+	ui.btn_version->setText("unzip complete");
 
 	return;
 }

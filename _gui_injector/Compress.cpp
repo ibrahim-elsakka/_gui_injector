@@ -122,3 +122,50 @@ void Compress::unzip()
     CoUninitialize();
 
 }
+
+void Compress::unzip_GH(WCHAR* source, WCHAR* dest)
+{
+    HRESULT         hResult;
+    IShellDispatch* pISD;
+    Folder*         pToFolder = NULL;
+    VARIANT         vDir, vFile, vOpt;
+
+    CoInitialize(NULL);
+
+    hResult = CoCreateInstance(CLSID_Shell, NULL, CLSCTX_INPROC_SERVER, IID_IShellDispatch, (void**)&pISD);
+
+    if (SUCCEEDED(hResult))
+    {
+        VariantInit(&vDir);
+        vDir.vt = VT_BSTR;
+        vDir.bstrVal = dest;//L"C:\\test.zip\\\0\0";
+        hResult = pISD->NameSpace(vDir, &pToFolder);
+
+        if (SUCCEEDED(hResult))
+        {
+            Folder* pFromFolder = NULL;
+
+            VariantInit(&vFile);
+            vFile.vt = VT_BSTR;
+            vFile.bstrVal = source;//L"C:\\test.txt";
+            pISD->NameSpace(vFile, &pFromFolder);
+            FolderItems* fi = NULL;
+            pFromFolder->Items(&fi);
+            VariantInit(&vOpt);
+            vOpt.vt = VT_I4;
+            vOpt.lVal = FOF_NO_UI;//4; // Do not display a progress dialog box
+
+            // Creating a new Variant with pointer to FolderItems to be copied
+            VARIANT newV;
+            VariantInit(&newV);
+            newV.vt = VT_DISPATCH;
+            newV.pdispVal = fi;
+            hResult = pToFolder->CopyHere(newV, vOpt);
+            Sleep(1000);
+            pFromFolder->Release();
+            pToFolder->Release();
+        }
+        pISD->Release();
+    }
+    CoUninitialize();
+}

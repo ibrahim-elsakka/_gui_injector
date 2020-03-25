@@ -6,8 +6,16 @@
 #include <qtimer.h>
 
 #include "ui_GuiMain.h"
+#include "DownloadManager.h"
 #include "GuiProcess.h"
 #include "Process.h"
+
+enum class UPDATE
+{
+	NOTHING,
+	UPDATE,
+	DOWNLOAD,
+};
 
 class GuiMain : public QMainWindow
 {
@@ -33,18 +41,20 @@ private:
 	QString	 darkSheet;
 
 	// Network
-	QNetworkAccessManager*	n_Manager;
-	QNetworkAccessManager	manager;
-	QVector<QNetworkReply*> currentDownloads;
+	QNetworkAccessManager*	ver_Manager;
+	DownloadManager			dl_Manager;
+	QString					zipName;
+	QString					onlineVersion;
 
 	// Settings
 	Process_State_Struct*	pss;
 	Process_Struct*			ps_picker;
-	//Process_Struct*			ps_main;
+	//Process_Struct*		ps_main;
 
 	QString		lastPathStr;
 	bool		ignoreUpdate;
 	bool		lightMode;
+	UPDATE		update;
 
 	QTimer* t_Auto_Inj;
 	QTimer* t_Delay_Inj;
@@ -98,7 +108,10 @@ private slots:
 	void tooltip_change();
 	void open_help();
 	void open_log();
-	void check_version();
-	void replyFinished(QNetworkReply* rep);
 
+	// Update
+	void check_online_version();
+	void replyFinished(QNetworkReply* rep);
+	void download_start();
+	void download_finish();
 };
