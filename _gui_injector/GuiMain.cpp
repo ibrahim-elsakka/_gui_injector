@@ -117,7 +117,7 @@ QString GuiMain::arch_to_str(const int arch)
 {
 	if (arch == 1) return QString("x64");
 	else if (arch == 2) return QString("x86");
-	else return QString("NONE");
+	else return QString("---");
 }
 
 void GuiMain::closeEvent(QCloseEvent* event)
@@ -368,7 +368,6 @@ void GuiMain::save_settings()
 	settings.setValue("TLS",			ui.cb_tls->isChecked());
 	settings.setValue("SEH",			ui.cb_seh->isChecked());
 	settings.setValue("PROTECTION",		ui.cb_protection->isChecked());
-	settings.setValue("SECURITY",		ui.cb_security->isChecked());
 	settings.setValue("DLLMAIN",		ui.cb_main->isChecked());
 
 	// Process picker
@@ -450,7 +449,6 @@ void GuiMain::load_settings()
 	ui.cb_tls		->setChecked(settings.value("TLS").toBool());
 	ui.cb_seh		->setChecked(settings.value("SEH").toBool());
 	ui.cb_protection->setChecked(settings.value("PROTECTION").toBool());
-	ui.cb_security	->setChecked(settings.value("SECURITY").toBool());
 	ui.cb_main		->setChecked(settings.value("DLLMAIN").toBool());
 
 	// Process picker
@@ -626,7 +624,7 @@ void GuiMain::inject_file()
 		QString fileStr	= (*it)->text(2);
 		for (int i = 0, j = 0; fileStr[i].toLatin1() != '\0'; i++, j++)
 		{
-			if (fileStr[i] == '\/')
+			if (fileStr[i] == '/')
 				data.szDllPath[j] = '\\';
 			else
 				data.szDllPath[j] = fileStr[i].toLatin1();		
@@ -728,7 +726,6 @@ void GuiMain::inject_file()
 		if (ui.cb_tls->isChecked())			data.Flags |= INJ_MM_EXECUTE_TLS;
 		if (ui.cb_seh->isChecked())			data.Flags |= INJ_MM_ENABLE_SEH;
 		if (ui.cb_protection->isChecked())	data.Flags |= INJ_MM_SET_PAGE_PROTECTIONS;
-		if (ui.cb_security->isChecked())	data.Flags |= INJ_MM_INIT_SECURITY_COOKIE;
 		if (ui.cb_main->isChecked())		data.Flags |= INJ_MM_RUN_DLL_MAIN;		
 	}
 
@@ -836,7 +833,6 @@ void GuiMain::tooltip_change()
 	ui.cb_tls->setToolTipDuration(duration);
 	ui.cb_seh->setToolTipDuration(duration);
 	ui.cb_protection->setToolTipDuration(duration);
-	ui.cb_security->setToolTipDuration(duration);
 	ui.cb_main->setToolTipDuration(duration);
 
 	ui.btn_reset->setToolTipDuration(duration);
@@ -963,7 +959,7 @@ void GuiMain::download_finish()
 	auto w = wStr.begin();
 	while (w != wStr.end())
 	{
-		if (*w == '\/')
+		if (*w == '/')
 		{
 			wStr2.append(L"\\");
 		}

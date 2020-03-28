@@ -541,16 +541,6 @@
             </property>
            </widget>
           </item>
-          <item row="7" column="0">
-           <widget class="QCheckBox" name="cb_tls">
-            <property name="toolTip">
-             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;executes TLS callbacks and initializes static TLS data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-            </property>
-            <property name="text">
-             <string>Execute TLS</string>
-            </property>
-           </widget>
-          </item>
           <item row="0" column="1">
            <widget class="QCheckBox" name="cb_seh">
             <property name="toolTip">
@@ -571,13 +561,6 @@
             </property>
            </widget>
           </item>
-          <item row="5" column="1">
-           <widget class="QCheckBox" name="cb_security">
-            <property name="text">
-             <string>Security cookie</string>
-            </property>
-           </widget>
-          </item>
           <item row="3" column="1">
            <widget class="QCheckBox" name="cb_protection">
             <property name="toolTip">
@@ -585,6 +568,16 @@
             </property>
             <property name="text">
              <string>Set page protections</string>
+            </property>
+           </widget>
+          </item>
+          <item row="5" column="1">
+           <widget class="QCheckBox" name="cb_tls">
+            <property name="toolTip">
+             <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;executes TLS callbacks and initializes static TLS data&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+            </property>
+            <property name="text">
+             <string>Execute TLS</string>
             </property>
            </widget>
           </item>

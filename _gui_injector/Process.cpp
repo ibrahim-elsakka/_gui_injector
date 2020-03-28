@@ -5,6 +5,7 @@
 #include <fstream>
 #include "process.h"
 
+f_NtQueryInformationProcess p_NtQueryInformationProcess = nullptr;
 
 enum ARCH getFileArch(const char* szDllFile)
 {
@@ -94,7 +95,37 @@ enum ARCH getProcArch(const int pid)
         }
         CloseHandle(hOpenProc);
     }
+
     return NONE;
+}
+
+int getProcSession(const int pid)
+{
+    if (!p_NtQueryInformationProcess)
+    {
+        auto h_nt_dll = GetModuleHandleA("ntdll.dll");
+        if (!h_nt_dll)
+        {
+            return -1;
+        }
+
+        p_NtQueryInformationProcess = reinterpret_cast<f_NtQueryInformationProcess>(GetProcAddress(h_nt_dll, "NtQueryInformationProcess"));
+        if (!p_NtQueryInformationProcess)
+        {
+            return -1;
+        }
+    }
+	
+    HANDLE hTargetProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+
+	PROCESS_SESSION_INFORMATION psi{ 0 };
+	NTSTATUS ntRet = p_NtQueryInformationProcess(hTargetProc, ProcessSessionInformation, &psi, sizeof(psi), nullptr);
+	if (NT_FAIL(ntRet))
+	{
+		return -1;
+	}
+
+	return (int)psi.SessionId;    
 }
 
 Process_Struct getProcessByName(const char* proc)
@@ -129,8 +160,8 @@ Process_Struct getProcessByName(const char* proc)
 
             } while (Process32Next(hSnapshot, &procEntry));
         }
+        CloseHandle(hSnapshot);
     }
-    CloseHandle(hSnapshot);
     return ps;
 }
 
@@ -166,8 +197,8 @@ Process_Struct getProcessByPID(const int pid)
 
             } while (Process32Next(hSnapshot, &procEntry));
         }
+        CloseHandle(hSnapshot);
     }
-    CloseHandle(hSnapshot);
     return ps;
 }
 
@@ -196,8 +227,8 @@ bool getProcessList(std::vector<Process_Struct>& pl)
 
             } while (Process32Next(hSnapshot, &procEntry));
         }
+        CloseHandle(hSnapshot);
     }
-    CloseHandle(hSnapshot);
     return true;
 }
 
