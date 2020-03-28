@@ -35,6 +35,7 @@ private slots:
 	void refresh_gui();
 	void refresh_process();
 	void filter_change(int i);
+	void session_change();
 	void name_change(const QString&);
 	void proc_select();
 };
