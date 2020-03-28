@@ -75,7 +75,7 @@ enum ARCH getFileArch(const char* szDllFile)
 
 enum ARCH getProcArch(const int pid)
 {
-    HANDLE hOpenProc = OpenProcess(PROCESS_QUERY_INFORMATION, NULL, pid);
+    HANDLE hOpenProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, NULL, pid);
     if (hOpenProc != NULL)
     {
         BOOL tempWow64 = FALSE;
