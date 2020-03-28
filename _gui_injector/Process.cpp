@@ -117,13 +117,20 @@ int getProcSession(const int pid)
     }
 	
     HANDLE hTargetProc = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+    if (!hTargetProc)
+    {
+        return -1;
+    }
 
-	PROCESS_SESSION_INFORMATION psi{ 0 };
-	NTSTATUS ntRet = p_NtQueryInformationProcess(hTargetProc, ProcessSessionInformation, &psi, sizeof(psi), nullptr);
-	if (NT_FAIL(ntRet))
-	{
-		return -1;
-	}
+    PROCESS_SESSION_INFORMATION psi{ 0 };
+    NTSTATUS ntRet = p_NtQueryInformationProcess(hTargetProc, ProcessSessionInformation, &psi, sizeof(psi), nullptr);
+    
+    CloseHandle(hTargetProc);
+	
+    if (NT_FAIL(ntRet))
+    {
+        return -1;
+    }
 
 	return (int)psi.SessionId;    
 }
