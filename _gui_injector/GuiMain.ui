@@ -692,6 +692,8 @@
  <layoutdefault spacing="6" margin="11"/>
  <resources>
   <include location="GuiMain.qrc"/>
+  <include location="DarkStyle/framelesswindow.qrc"/>
+  <include location="DarkStyle/darkstyle.qrc"/>
  </resources>
  <connections/>
 </ui>

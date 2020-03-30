@@ -343,3 +343,5 @@ healthchecksdb
 /Static
 /QT_GH_Injector.zip
 /_gui_injector/Win32/Static/qmake
+/_gui_injector/Win32/Static
+/Win32/Static

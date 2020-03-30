@@ -8,6 +8,10 @@
 #include <qsettings.h>
 #include <qdir.h>
 
+#include <urlmon.h>
+#include <fstream>
+#include <string>
+
 #include <string>
 #include "Banner.h"
 #include "Process.h"
@@ -81,8 +85,8 @@ GuiMain::GuiMain(QWidget* parent)
 	ui.tree_files->clear();
 
 	load_settings();
-	color_setup();
-	color_change();
+	//color_setup();
+	//color_change();
 	load_change(42);
 	create_change(42);
 	//check_online_version();
@@ -125,6 +129,28 @@ QString GuiMain::arch_to_str(const int arch)
 void GuiMain::closeEvent(QCloseEvent* event)
 {
 	save_settings();
+}
+
+std::string GuiMain::getVersionFromIE()
+{
+	char cacheFile[MAX_PATH] = { 0 };
+	HRESULT hRes = URLDownloadToCacheFileA(nullptr, "https://guidedhacking.com/gh/inj/", cacheFile, sizeof(cacheFile), 0, nullptr);
+
+	if (hRes != S_OK)
+		return "";
+
+	// Read file 
+	std::ifstream infile(cacheFile, std::ifstream::in);
+
+	if (!infile)
+		return "";
+
+	std::string strVer;
+	infile >> strVer;
+
+	infile.close();
+
+	return strVer;
 }
 
 void GuiMain::platformCheck()
@@ -594,6 +620,11 @@ void GuiMain::add_file_dialog()
 
 void GuiMain::add_file_to_list(QString str)
 {
+	// nop, not the same files
+	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
+		if ((*it)->text(2) == str)
+			return;
+
 	QFileInfo fi(str);
 	QTreeWidgetItem* item = new QTreeWidgetItem(ui.tree_files);
 
@@ -888,12 +919,12 @@ void GuiMain::tooltip_change()
 
 void GuiMain::open_help()
 {
-	bool ok = QDesktopServices::openUrl(QUrl("https://guidedhacking.com/resources/guided-hacking-dll-injector.4/", QUrl::TolerantMode));
+	bool ok = QDesktopServices::openUrl(QUrl(GH_HELP_URL, QUrl::TolerantMode));
 }
 
 void GuiMain::open_log()
 {
-	bool ok = QDesktopServices::openUrl(QUrl("https://pastebin.com/eN7KPX3x", QUrl::TolerantMode));
+	bool ok = QDesktopServices::openUrl(QUrl(GH_LOG_URL, QUrl::TolerantMode));
 }
 
 void GuiMain::check_online_version()
@@ -901,11 +932,15 @@ void GuiMain::check_online_version()
 
 	ui.btn_version->setText("check version...");
 	ui.btn_version->setEnabled(false);
-#ifdef _DEBUG
-	ver_Manager->get(QNetworkRequest(QUrl("http://nas:80/gh_version.html")));
-#else
-	ver_Manager->get(QNetworkRequest(QUrl("https://guidedhacking.com/gh/inj/")));
-#endif // _DEBUG	
+
+	std::string ver = getVersionFromIE();
+	onlineVersion = QString::fromUtf8(ver.c_str());
+	emit download_start();
+	return;
+
+	// Old
+	ver_Manager->get(QNetworkRequest(QUrl(GH_VERSION_URL)));
+
 	return;	
 }
 
