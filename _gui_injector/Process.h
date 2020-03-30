@@ -49,3 +49,5 @@ Process_Struct getProcessByPID(const int pid);
 bool getProcessList(std::vector<Process_Struct>& pl);
 
 bool SetDebugPrivilege(bool Enable);
+bool isCorrectPlatform();
+BOOL StartProcess(const char* szExeFile);

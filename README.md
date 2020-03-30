@@ -16,11 +16,12 @@
 - https://guidedhacking.com/resources/guided-hacking-dll-injector.4/
 
 ## ToDo:
-- Compile x86 version (works)
-- Update function (download/zip)
-- Process picker Current Session Button function
 - Delay Injection (Thread creation)
 - Banner white color correction
+- Update function (download/zip)
+- drag and drop für gui
+
+
 
 ## Bugs:
 - color change sometimes stays on black

@@ -1,4 +1,0 @@
-ToDo:
-- Remove Color Change
-- update function (buggy but works)
-- Current Session (maybe later)

@@ -1,18 +1,17 @@
 #include "GuiMain.h"
 #include <QtWidgets/QApplication>
 #include "Process.h"
+#include <Windows.h>
+#include <qmessagebox.h>
+
+
 
 
 int main(int argc, char* argv[])
 {
 
-    //QStringList arguments;
-    //arguments.push_back("http://speedtest.tele2.net/1MB.zip");
-    //arguments.push_back("https://guidedhacking.com/gh/inj/V3.3/GH Injector.zip");
-    //manager.doDownload(QUrl("http://nas:80/test.zip"));
-    // manager.doDownload(QUrl("http://speedtest.tele2.net/1MB.zip"));
 
-    //return a.exec();
+    qApp->quit();
 
     // Restart Application loop
     int currentExitCode = 0;

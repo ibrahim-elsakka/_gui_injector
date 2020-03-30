@@ -270,3 +270,50 @@ bool SetDebugPrivilege(bool Enable)
     CloseHandle(hToken);
     return TRUE;
 }
+
+bool isCorrectPlatform()
+{
+    SYSTEM_INFO stInfo;
+    GetSystemInfo(&stInfo);
+    int proccessArch = stInfo.wProcessorArchitecture;
+
+    SYSTEM_INFO stInfo2;
+    GetNativeSystemInfo(&stInfo2);
+    int platformArch = stInfo2.wProcessorArchitecture;
+
+    if (proccessArch == platformArch)
+        return true;
+
+    return false;
+}
+
+BOOL StartProcess(const char* szExeFile)
+{
+    STARTUPINFO si;
+    PROCESS_INFORMATION pi;
+
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);
+
+    ZeroMemory(&pi, sizeof(pi));
+
+    wchar_t wtext[MAX_PATH];
+    mbstowcs(wtext, szExeFile, strlen(szExeFile) + 1);
+    LPWSTR ptr = wtext;
+
+    bool status = CreateProcess(NULL, ptr, NULL, NULL, TRUE, NORMAL_PRIORITY_CLASS, NULL, NULL, &si, &pi);
+
+    if (!status)
+    {
+        //printf("Failed");
+        return FALSE;
+    }
+
+    //WaitForSingleObject(pi.hProcess, INFINITE);
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    //printf("Success Process created");
+
+    return TRUE;
+}

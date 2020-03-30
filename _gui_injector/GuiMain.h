@@ -17,6 +17,9 @@ enum class UPDATE
 	DOWNLOAD,
 };
 
+#define GH_INJ_EXE_NAME64A "GH Injector - x64.exe"
+#define GH_INJ_EXE_NAME86A "GH Injector - x86.exe"
+
 class GuiMain : public QMainWindow
 {
 	Q_OBJECT
@@ -68,6 +71,7 @@ signals:
 private slots:
 	// Titelbar
 	void closeEvent(QCloseEvent* event);
+	void platformCheck();
 
 	// Settings
 	void rb_process_set();

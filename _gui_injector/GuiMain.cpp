@@ -26,7 +26,7 @@ GuiMain::GuiMain(QWidget* parent)
 	connect(ui.rb_pid,   SIGNAL(clicked()), this, SLOT(rb_pid_set()));
 	connect(ui.btn_proc, SIGNAL(clicked()), this, SLOT(btn_pick_process_click()));
 	connect(ui.cmb_proc, SIGNAL(currentTextChanged(const QString&)), this, SLOT(cmb_proc_name_change()));
-	connect(ui.txt_pid,  SIGNAL(textChanged(const QString&)), this, SLOT(txt_pid_change()));
+	connect(ui.txt_pid,  SIGNAL(textChanged(const QString&)),		 this, SLOT(txt_pid_change()));
 
 	// Auto, Reset, Color
 	connect(ui.cb_auto,   SIGNAL(clicked()), this, SLOT(auto_inject()));
@@ -36,7 +36,7 @@ GuiMain::GuiMain(QWidget* parent)
 	// Method, Cloaking, Advanced
 	connect(ui.cmb_load,   SIGNAL(currentIndexChanged(int)), this, SLOT(load_change(int)));
 	connect(ui.cmb_create, SIGNAL(currentIndexChanged(int)), this, SLOT(create_change(int)));
-	connect(ui.cb_main,	   SIGNAL(clicked()), this, SLOT(cb_main_clicked()));
+	connect(ui.cb_main,	   SIGNAL(clicked()),				 this, SLOT(cb_main_clicked()));
 
 	// Files
 	connect(ui.btn_add,    SIGNAL(clicked()), this, SLOT(add_file_dialog()));
@@ -54,7 +54,7 @@ GuiMain::GuiMain(QWidget* parent)
 	QObject::connect(&dl_Manager, SIGNAL(finished()), this, SLOT(download_finish()));
 
 	gui_Picker  = new GuiProcess();
-	ver_Manager   = new QNetworkAccessManager(this);
+	ver_Manager = new QNetworkAccessManager(this);
 	t_Auto_Inj  = new QTimer(this);
 	t_Delay_Inj = new QTimer(this);
 	pss         = new Process_State_Struct;
@@ -92,6 +92,8 @@ GuiMain::GuiMain(QWidget* parent)
 	winSize.setHeight(500);
 	this->resize(winSize);
 
+	platformCheck();
+
 	bool status = SetDebugPrivilege(true);
 	int i = 42;
 }
@@ -123,6 +125,40 @@ QString GuiMain::arch_to_str(const int arch)
 void GuiMain::closeEvent(QCloseEvent* event)
 {
 	save_settings();
+}
+
+void GuiMain::platformCheck()
+{
+#ifdef _WIN32
+
+	// windows 64-bit == gh64.exe
+	bool bPlatform = isCorrectPlatform();
+	if (bPlatform == true)
+		return;
+
+	// Won't work
+	ui.cb_hijack->setChecked(false);
+	ui.cb_hijack->setDisabled(true);
+
+
+	QMessageBox::StandardButton reply;
+	reply = QMessageBox::warning(nullptr, "Warning architecture conflict", "Since you're using a\
+64-bit version of Windows it's recommended to use the 64-bitversion of the injector. \
+Do you want to switch to the 64-bit version?", QMessageBox::Yes | QMessageBox::No);
+
+	if (reply == QMessageBox::No)
+		return;
+		
+	bool bStart = StartProcess(GH_INJ_EXE_NAME64A);
+	if (bStart == false)
+		return; // can't start, maybe msgbox
+
+
+	//qApp->quit();
+	// I am qt and do not want to close
+	QTimer::singleShot(250, qApp, SLOT(quit()));
+
+#endif // _WIN64
 }
 
 void GuiMain::rb_process_set()
