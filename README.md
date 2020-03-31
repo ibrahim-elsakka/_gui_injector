@@ -22,6 +22,8 @@
 - Recode unzip
 - drag and drop für gui
 - URLDownloadToFile instead of qt download manager
+- sort pid
+- other dark style https://github.com/Jorgen-VikingGod/Qt-Frameless-Window-DarkStyle
 
 
 ## Bugs:

@@ -65,6 +65,9 @@
     <QtUic Include="GuiProcess.ui">
       <Filter>Form Files</Filter>
     </QtUic>
+    <QtUic Include="mainwindow.ui">
+      <Filter>Form Files</Filter>
+    </QtUic>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="GuiMain.qrc">
@@ -87,9 +90,6 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <Text Include="ToDo.txt" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\README.md" />

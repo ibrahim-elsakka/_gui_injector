@@ -1,8 +1,0 @@
-ToDo:
-- und ist es moeglich, bei x86 builds die combo box im process picker komplett zu deaktivieren?
-- sort pid
-- URLDownloadToCacheFIle
-    URLDownloadToFileA(nullptr, "http://guidedhacking.com/gh/inj/", "C:\\noob.txt", 0, nullptr);
-
-
-https://github.com/Jorgen-VikingGod/Qt-Frameless-Window-DarkStyle

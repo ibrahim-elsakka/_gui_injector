@@ -85,11 +85,12 @@ GuiMain::GuiMain(QWidget* parent)
 	ui.tree_files->clear();
 
 	load_settings();
-	//color_setup();
-	//color_change();
+	color_setup();
+	color_change();
 	load_change(42);
 	create_change(42);
 	//check_online_version();
+	load_Dll();
 
 	// Reduze Height
 	QSize winSize = this->size();
@@ -104,6 +105,7 @@ GuiMain::GuiMain(QWidget* parent)
 
 GuiMain::~GuiMain()
 {
+	free_Dll();
 	delete gui_Picker;
 	delete ver_Manager;
 	delete t_Auto_Inj;
@@ -134,7 +136,7 @@ void GuiMain::closeEvent(QCloseEvent* event)
 std::string GuiMain::getVersionFromIE()
 {
 	char cacheFile[MAX_PATH] = { 0 };
-	HRESULT hRes = URLDownloadToCacheFileA(nullptr, "https://guidedhacking.com/gh/inj/", cacheFile, sizeof(cacheFile), 0, nullptr);
+	HRESULT hRes = URLDownloadToCacheFileA(nullptr, GH_VERSION_URL, cacheFile, sizeof(cacheFile), 0, nullptr);
 
 	if (hRes != S_OK)
 		return "";
@@ -267,7 +269,7 @@ void GuiMain::auto_inject()
 	if (ui.cb_auto->isChecked())
 	{
 		// Restart if running
-		t_Auto_Inj->start(1000);
+		t_Auto_Inj->start(200);
 	}
 	else
 	{
@@ -385,6 +387,7 @@ void GuiMain::save_settings()
 	{
 		settings.setArrayIndex(i);
 		settings.setValue(QString::number(i), (*it)->text(2));
+		settings.setValue(QString::number(++i), (*it)->text(0));
 		++it; i++;
 	}
 	settings.endArray();
@@ -466,14 +469,16 @@ void GuiMain::load_settings()
 
 
 	int fileSize = settings.beginReadArray("FILES");
-	for (int i = 0; i < fileSize; ++i) {
+	for (int i = 0; i < fileSize; ++++i) {
 		settings.setArrayIndex(i);
-		add_file_to_list(settings.value(QString::number(i)).toString());
+		add_file_to_list(
+			settings.value(QString::number(i)).toString(),
+			settings.value(QString::number(i + 1)).toString());
 	}
 	settings.endArray();
 
 	int procSize = settings.beginReadArray("PROCESS");
-	for (int i = 0; i < procSize; ++i) {
+	for (int i = 0; i < procSize; ++++i) {
 		settings.setArrayIndex(i);
 		ui.cmb_proc->addItem(settings.value(QString::number(i)).toString());
 	}
@@ -613,12 +618,12 @@ void GuiMain::add_file_dialog()
 	fDialog.exec();
 
 	for (auto l : fDialog.selectedFiles())
-		GuiMain::add_file_to_list(l);
+		GuiMain::add_file_to_list(l, "");
 
 	lastPathStr = fDialog.windowFilePath();
 }
 
-void GuiMain::add_file_to_list(QString str)
+void GuiMain::add_file_to_list(QString str, QString active)
 {
 	// nop, not the same files
 	for (QTreeWidgetItemIterator it(ui.tree_files); (*it) != nullptr; ++it)
@@ -628,6 +633,7 @@ void GuiMain::add_file_to_list(QString str)
 	QFileInfo fi(str);
 	QTreeWidgetItem* item = new QTreeWidgetItem(ui.tree_files);
 
+	item->setText(0, active);
 	item->setText(1, fi.fileName());
 	item->setText(2, fi.absoluteFilePath());
 	int arch = (int)getFileArch(fi.absoluteFilePath().toStdString().c_str());
@@ -645,6 +651,13 @@ void GuiMain::select_file()
 {
 	QTreeWidgetItem* it2 = ui.tree_files->currentItem();
 
+	if(it2->text(0) == "")
+		it2->setText(0, "YES");
+	else
+		it2->setText(0, "");
+
+	return;
+	// Old
 	QTreeWidgetItemIterator it(ui.tree_files);
 	while (*it)
 	{
@@ -712,120 +725,129 @@ void GuiMain::inject_file()
 			emit injec_status(false, "File Architecture invalid");
 			return;
 		}
-	}
 
-	// Check File Selected
-	if (fileType == NONE)
-	{
-		emit injec_status(false, "File not selected");
-		return;
-	}
 
-	// Process ID
-	if (ui.rb_pid->isChecked())
-	{
-		int id = ui.txt_pid->text().toInt();
-		if (id)
+		// Check File Selected
+		if (fileType == NONE)
 		{
-			data.ProcessID = id;
-			processType = getProcArch(id);
-		}
-		else
-		{
-			emit injec_status(false, "Invalid PID");
+			emit injec_status(false, "File not selected");
 			return;
 		}
-	}
-	else // Process Name
-	{
+
+		// Process ID
+		if (ui.rb_pid->isChecked())
+		{
+			int id = ui.txt_pid->text().toInt();
+			if (id)
+			{
+				data.ProcessID = id;
+				processType = getProcArch(id);
+			}
+			else
+			{
+				emit injec_status(false, "Invalid PID");
+				return;
+			}
+		}
+		else // Process Name
+		{
 		
-		int index = ui.cmb_proc->currentIndex();
-		Process_Struct p = getProcessByName(ui.cmb_proc->itemText(index).toStdString().c_str());
-		if (p.pid)
-		{
-			data.ProcessID = p.pid;
-			processType = p.arch;		
+			int index = ui.cmb_proc->currentIndex();
+			Process_Struct p = getProcessByName(ui.cmb_proc->itemText(index).toStdString().c_str());
+			if (p.pid)
+			{
+				data.ProcessID = p.pid;
+				processType = p.arch;		
+			}
+			else
+			{
+				emit injec_status(false, "Invalid Process Name");
+				return;
+			}
 		}
-		else
+
+		if (processType != fileType || processType == NULL || fileType == NULL)
 		{
-			emit injec_status(false, "Invalid Process Name");
+			emit injec_status(false, "File and Process are incompatible");
 			return;
 		}
-	}
-
-	if (processType != fileType || processType == NULL || fileType == NULL)
-	{
-		emit injec_status(false, "File and Process are incompatible");
-		return;
-	}
 
 
-	switch (ui.cmb_load->currentIndex()) 
-	{
-		case 1:  data.Mode = INJECTION_MODE::IM_LoadLibraryExW; break;
-		case 2:  data.Mode = INJECTION_MODE::IM_LdrLoadDll;		break;
-		case 3:  data.Mode = INJECTION_MODE::IM_LdrpLoadDll;    break;
-		default: data.Mode = INJECTION_MODE::IM_LoadLibraryExW; break;
-	}
+		switch (ui.cmb_load->currentIndex()) 
+		{
+			case 1:  data.Mode = INJECTION_MODE::IM_LoadLibraryExW; break;
+			case 2:  data.Mode = INJECTION_MODE::IM_LdrLoadDll;		break;
+			case 3:  data.Mode = INJECTION_MODE::IM_LdrpLoadDll;    break;
+			default: data.Mode = INJECTION_MODE::IM_LoadLibraryExW; break;
+		}
 
-	switch (ui.cmb_create->currentIndex())
-	{
-		case 1:  data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;	break;
-		case 2:  data.Method = LAUNCH_METHOD::LM_HijackThread;		break;
-		case 3:  data.Method = LAUNCH_METHOD::LM_SetWindowsHookEx;  break;
-		default: data.Method = LAUNCH_METHOD::LM_QueueUserAPC;		break;
-	}
+		switch (ui.cmb_create->currentIndex())
+		{
+			case 1:  data.Method = LAUNCH_METHOD::LM_NtCreateThreadEx;	break;
+			case 2:  data.Method = LAUNCH_METHOD::LM_HijackThread;		break;
+			case 3:  data.Method = LAUNCH_METHOD::LM_SetWindowsHookEx;  break;
+			default: data.Method = LAUNCH_METHOD::LM_QueueUserAPC;		break;
+		}
 
-	if (ui.cmb_peh->currentIndex() == 1)	data.Flags |= INJ_ERASE_HEADER;
-	if (ui.cmb_peh->currentIndex() == 2)	data.Flags |= INJ_FAKE_HEADER;
-	if (ui.cb_unlink->isChecked())			data.Flags |= INJ_UNLINK_FROM_PEB;
-	if (ui.cb_clock->isChecked())			data.Flags |= INJ_THREAD_CREATE_CLOAKED;
-	if (ui.cb_random->isChecked())			data.Flags |= INJ_SCRAMBLE_DLL_NAME;
-	if (ui.cb_copy->isChecked())			data.Flags |= INJ_LOAD_DLL_COPY;
-	if (ui.cb_hijack->isChecked())			data.Flags |= INJ_HIJACK_HANDLE;
+		if (ui.cmb_peh->currentIndex() == 1)	data.Flags |= INJ_ERASE_HEADER;
+		if (ui.cmb_peh->currentIndex() == 2)	data.Flags |= INJ_FAKE_HEADER;
+		if (ui.cb_unlink->isChecked())			data.Flags |= INJ_UNLINK_FROM_PEB;
+		if (ui.cb_clock->isChecked())			data.Flags |= INJ_THREAD_CREATE_CLOAKED;
+		if (ui.cb_random->isChecked())			data.Flags |= INJ_SCRAMBLE_DLL_NAME;
+		if (ui.cb_copy->isChecked())			data.Flags |= INJ_LOAD_DLL_COPY;
+		if (ui.cb_hijack->isChecked())			data.Flags |= INJ_HIJACK_HANDLE;
 	
-	if (data.Mode == INJECTION_MODE::IM_ManualMap)
-	{
-		if (ui.cb_shift->isChecked())		data.Flags |= INJ_MM_SHIFT_MODULE;
-		if (ui.cb_clean->isChecked())		data.Flags |= INJ_MM_CLEAN_DATA_DIR;
-		if (ui.cb_imports->isChecked())		data.Flags |= INJ_MM_RESOLVE_IMPORTS;
-		if (ui.cb_delay->isChecked())		data.Flags |= INJ_MM_RESOLVE_DELAY_IMPORTS;
-		if (ui.cb_tls->isChecked())			data.Flags |= INJ_MM_EXECUTE_TLS;
-		if (ui.cb_seh->isChecked())			data.Flags |= INJ_MM_ENABLE_SEH;
-		if (ui.cb_protection->isChecked())	data.Flags |= INJ_MM_SET_PAGE_PROTECTIONS;
-		if (ui.cb_main->isChecked())		data.Flags |= INJ_MM_RUN_DLL_MAIN;		
-	}
+		if (data.Mode == INJECTION_MODE::IM_ManualMap)
+		{
+			if (ui.cb_shift->isChecked())		data.Flags |= INJ_MM_SHIFT_MODULE;
+			if (ui.cb_clean->isChecked())		data.Flags |= INJ_MM_CLEAN_DATA_DIR;
+			if (ui.cb_imports->isChecked())		data.Flags |= INJ_MM_RESOLVE_IMPORTS;
+			if (ui.cb_delay->isChecked())		data.Flags |= INJ_MM_RESOLVE_DELAY_IMPORTS;
+			if (ui.cb_tls->isChecked())			data.Flags |= INJ_MM_EXECUTE_TLS;
+			if (ui.cb_seh->isChecked())			data.Flags |= INJ_MM_ENABLE_SEH;
+			if (ui.cb_protection->isChecked())	data.Flags |= INJ_MM_SET_PAGE_PROTECTIONS;
+			if (ui.cb_main->isChecked())		data.Flags |= INJ_MM_RUN_DLL_MAIN;		
+		}
 
-	//HINSTANCE	hinstLib = LoadLibraryA("C:\\Users\\kage\\Downloads\\GuidedHacking-Injector-master\\GuidedHacking-Injector-master\\GH Injector Library\\Release\\x64\\GH Injector - x64.dll");
+		//HINSTANCE	hinstLib = LoadLibraryA("C:\\Users\\kage\\Downloads\\GuidedHacking-Injector-master\\GuidedHacking-Injector-master\\GH Injector Library\\Release\\x64\\GH Injector - x64.dll");
 
-	HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
-	if (hInjectionMod == NULL)
-	{
-		emit injec_status(false, "GH Injector - xNN.dll not found");
-		return;
-	}
+		//HINSTANCE hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
+		//if (hInjectionMod == NULL)
+		//{
+		//	emit injec_status(false, "GH Injector - xNN.dll not found");
+		//	return;
+		//}
 
-	f_InjectA injectFunc = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
-	if (injectFunc == NULL)
-	{
-		BOOL fFreeResult = FreeLibrary(hInjectionMod);
-		emit injec_status(false, "InjectA not found");
-		return;
-	}
+		//f_InjectA injectFunc = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
+		//if (injectFunc == NULL)
+		//{
+		//	BOOL fFreeResult = FreeLibrary(hInjectionMod);
+		//	emit injec_status(false, "InjectA not found");
+		//	return;
+		//}
 
-	DWORD res = injectFunc(&data);
-	if (res)
-	{
-		BOOL fFreeResult = FreeLibrary(hInjectionMod);
-		QString errorCode("\nLast Errorcode" + QString::number(data.LastErrorCode));
-		emit injec_status(false, "InjectA failed with " + errorCode);
-		return;
-	}
+		if (injectFunc == nullptr)
+		{
+			emit injec_status(false, "InjectA not found");
+			return;
+		}
 
-	if (ui.cb_close->isChecked())
-	{
-		qApp->exit(0);
-		return;
+
+		DWORD res = injectFunc(&data);
+		if (res)
+		{
+			//BOOL fFreeResult = FreeLibrary(hInjectionMod);
+			QString errorCode("\nLast Errorcode" + QString::number(data.LastErrorCode));
+			emit injec_status(false, "InjectA failed with " + errorCode);
+			return;
+		}
+
+		if (ui.cb_close->isChecked())
+		{
+			qApp->exit(0);
+			return;
+		}
+
 	}
 
 	emit injec_status(true, "Sucess Injection");
@@ -851,6 +873,29 @@ void GuiMain::injec_status(bool ok, QString msg)
 		messageBox.critical(0, "Error", msg);
 		messageBox.setFixedSize(500, 200);
 	}
+}
+
+void GuiMain::load_Dll()
+{
+	hInjectionMod = LoadLibrary(GH_INJ_MOD_NAME);
+	if (hInjectionMod == NULL)
+	{
+		emit injec_status(false, "GH Injector - xNN.dll not found");
+		return;
+	}
+
+	injectFunc = (f_InjectA)GetProcAddress(hInjectionMod, "InjectA");
+	if (injectFunc == NULL)
+	{
+		BOOL fFreeResult = FreeLibrary(hInjectionMod);
+		emit injec_status(false, "InjectA not found");
+		return;
+	}
+}
+
+void GuiMain::free_Dll()
+{
+	BOOL fFreeResult = FreeLibrary(hInjectionMod);
 }
 
 

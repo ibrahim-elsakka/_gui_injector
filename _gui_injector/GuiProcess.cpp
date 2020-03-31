@@ -15,6 +15,7 @@ GuiProcess::GuiProcess(QWidget* parent)
 
 	for (int i = 0; i <= 3; i++)
 		ui.tree_process->resizeColumnToContents(i);
+
 }
 
 GuiProcess::~GuiProcess()
@@ -161,6 +162,11 @@ void GuiProcess::get_from_inj(Process_State_Struct* procStateStruct, Process_Str
 	ui.cmb_arch->setCurrentIndex(pss->cmbArch);
 	ui.cb_session->setChecked(pss->cbSession);
 	memset(ps, 0, sizeof(Process_Struct));
+
+#ifdef _WIN32
+	ui.cmb_arch->setDisabled(true);
+	ui.cmb_arch->setCurrentIndex(ARCH::X86);
+#endif // WIN64
 
 	refresh_process();
 }

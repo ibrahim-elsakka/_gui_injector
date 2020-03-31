@@ -9,6 +9,7 @@
 #include "DownloadManager.h"
 #include "GuiProcess.h"
 #include "Process.h"
+#include "Injection.h"
 
 enum class UPDATE
 {
@@ -72,6 +73,9 @@ private:
 	QTimer* t_Auto_Inj;
 	QTimer* t_Delay_Inj;
 
+	HINSTANCE hInjectionMod;
+	f_InjectA injectFunc;
+
 	std::string getVersionFromIE();
 
 public slots:
@@ -113,12 +117,14 @@ private slots:
 
 	// Files
 	void add_file_dialog();
-	void add_file_to_list(QString str);
+	void add_file_to_list(QString str, QString active);
 	void remove_file();
 	void select_file();
 	void delay_inject();
 	void inject_file();
 	void injec_status(bool ok, QString msg);
+	void load_Dll();
+	void free_Dll();
 
 	// Info
 	void tooltip_change();
@@ -130,4 +136,5 @@ private slots:
 	void replyFinished(QNetworkReply* rep);
 	void download_start();
 	void download_finish();
+
 };
