@@ -1,3 +1,6 @@
+# This is an old version
+- Check out the new version https://github.com/multikill/QT_GH_Injector
+
 # Qt GH DLL Injector
 - Rebuild Guided Hacking DLL Injector
 - Download link can be found on the Release
@@ -20,7 +23,7 @@
 - Delay Injection, set correct time
 - Banner white color correction
 - Recode unzip
-- drag and drop für gui
+- drag and drop fÃ¼r gui
 - URLDownloadToFile instead of qt download manager
 - sort pid
 - other dark style https://github.com/Jorgen-VikingGod/Qt-Frameless-Window-DarkStyle
